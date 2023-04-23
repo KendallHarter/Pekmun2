@@ -1,6 +1,10 @@
 set(CMAKE_SYSTEM_NAME generic)
 set(CMAKE_SYSTEM_PROCESSOR ARM)
 
+if ("$ENV{DEVKITARM}" STREQUAL "" OR "$ENV{DEVKITPRO}" STREQUAL "")
+   message(FATAL_ERROR "DEVKITPRO environment variables not found!")
+endif()
+
 set(CMAKE_C_COMPILER "$ENV{DEVKITARM}/bin/arm-none-eabi-gcc")
 set(CMAKE_CXX_COMPILER "$ENV{DEVKITARM}/bin/arm-none-eabi-g++")
 
