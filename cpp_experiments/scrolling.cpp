@@ -67,7 +67,7 @@ int main()
    gba::dma3_copy(std::begin(font), std::end(font), text_write_loc);
    gba::dma3_fill(bg0_base, bg0_base + 256 / 8 * 256 / 8, blank_tile);
    gba::dma3_fill(bg1_base, bg1_base + 256 / 8 * 256 / 8, blank_tile);
-   *(volatile std::uint16_t*)(0x4000008) = 0b0001'1110'0000'0011;
+   *(volatile std::uint16_t*)(0x4000008) = 0b0001'1110'0000'0000;
    *(volatile std::uint16_t*)(0x400000A) = 0b0001'1111'0000'0010;
    const auto bg0_loc
       = [&](int x, int y) { return ((volatile std::uint16_t*)((std::uint8_t*)bg0_base + x * 2 + y * 0x40)); };
@@ -135,7 +135,7 @@ int main()
          camera_x = 0;
          camera_y = 0;
       }
-      const auto change_amount = keypad.r_held() ? 5 : 1;
+      const auto change_amount = keypad.r_held() ? 8 : 1;
       if (keypad.left_held()) {
          camera_x -= change_amount;
       }
@@ -198,6 +198,7 @@ int main()
       const auto end_line = *(volatile std::uint16_t*)(0x4000006);
       char tester[10] = {'\0'};
       std::to_chars(std::begin(tester), std::end(tester), end_line - start_line);
+      write_it("      ", 0, 1);
       write_it(tester, 0, 1);
    }
 }

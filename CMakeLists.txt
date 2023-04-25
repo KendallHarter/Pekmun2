@@ -58,12 +58,22 @@ fix_gba_target(pekmun2)
 add_executable(scrolling cpp_experiments/scrolling.cpp)
 fix_gba_target(scrolling)
 
+add_executable(layers cpp_experiments/layers.cpp)
+fix_gba_target(layers)
+
+# For experiments use this target
+add_library(experiment_includes INTERFACE)
+target_include_directories(experiment_includes INTERFACE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 # Include the build directory so generated files can be accessed
 target_include_directories(pekmun2 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
-target_include_directories(scrolling PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(scrolling PUBLIC experiment_includes)
+target_link_libraries(layers PUBLIC experiment_includes)
 
 process_image(font.png font)
-add_dependencies(pekmun2 generate_font)
-
 process_image(test_tileset.png test_tileset)
+process_image(snake.png snake)
+
+add_dependencies(pekmun2 generate_font)
 add_dependencies(scrolling generate_test_tileset generate_font)
+add_dependencies(layers generate_test_tileset generate_snake)
