@@ -16,7 +16,7 @@ snake.set_colorkey(snake.get_at((0, 0)))
 cursor = pygame.image.load('../assets/cursor.png')
 cursor.set_colorkey(cursor.get_at((0, 0)))
 
-move_indic = pygame.image.load('../assets/move_indicator.png')
+move_indic = pygame.image.load('../assets/py_move_indicator.png')
 move_indic.set_colorkey(move_indic.get_at((0, 0)))
 
 with open('../assets/test_map.json') as f:

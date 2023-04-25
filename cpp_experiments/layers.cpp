@@ -1,5 +1,6 @@
 #include "gba.hpp"
 
+#include "generated/move_indicator.hpp"
 #include "generated/snake.hpp"
 #include "generated/test_tileset.hpp"
 
@@ -169,16 +170,25 @@ int main()
    volatile std::uint16_t* obj_palettes = (std::uint16_t*)0x5000200;
    volatile std::uint32_t* tiles_data = (std::uint32_t*)0x6000000;
    volatile std::uint32_t* obj_tile_data = (std::uint32_t*)0x6010000;
+   volatile std::uint16_t* bg0_base = (std::uint16_t*)0x6008000;
+   volatile std::uint16_t* bg1_base = (std::uint16_t*)0x6008800;
    volatile std::uint16_t* bg2_base = (std::uint16_t*)0x600F000;
    volatile std::uint16_t* bg3_base = (std::uint16_t*)((std::uint8_t*)tiles_data + 0x800 * 31);
 
-   gba::dma3_copy(std::begin(test_tileset), std::end(test_tileset), tiles_data);
+   const auto end_tiles = gba::dma3_copy(std::begin(test_tileset), std::end(test_tileset), tiles_data);
+   gba::dma3_copy(std::begin(move_indicator), std::end(move_indicator), end_tiles);
    gba::dma3_copy(std::begin(test_tileset_pal), std::end(test_tileset_pal), bg_palettes);
+   gba::dma3_copy(std::begin(move_indicator_pal), std::end(move_indicator_pal), bg_palettes + 16);
+   gba::dma3_fill(bg0_base, bg0_base + 256 / 8 * 256 / 8, blank_tile);
+   gba::dma3_fill(bg1_base, bg1_base + 256 / 8 * 256 / 8, blank_tile);
    gba::dma3_fill(bg2_base, bg2_base + 256 / 8 * 256 / 8, blank_tile);
    gba::dma3_fill(bg3_base, bg3_base + 256 / 8 * 256 / 8, blank_tile);
    gba::dma3_copy(std::begin(snake), std::end(snake), obj_tile_data);
    gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), obj_palettes);
 
+   // Set-up bg0 and bg1 properties
+   *(volatile std::uint16_t*)(0x4000008) = 0b0001'0000'0000'0000;
+   *(volatile std::uint16_t*)(0x400000A) = 0b0001'0001'0000'0001;
    // Set-up bg2 and bg3 properties
    *(volatile std::uint16_t*)(0x400000C) = 0b0001'1110'0000'0000;
    *(volatile std::uint16_t*)(0x400000E) = 0b0001'1111'0000'0001;
@@ -213,8 +223,8 @@ int main()
    gba::lcd.set_options(gba::lcd_options{}
                            .set(bg_mode{0})
                            .set(forced_blank::off)
-                           // .set(display_bg0::on)
-                           // .set(display_bg1::on)
+                           .set(display_bg0::on)
+                           .set(display_bg1::on)
                            .set(display_bg2::on)
                            .set(display_bg3::on)
                            .set(display_obj::on)
@@ -226,6 +236,11 @@ int main()
    int snake_x = 0;
    int snake_y = 0;
    gba::keypad_status keypad;
+   std::array<std::uint16_t, 256 / 8 * 256 / 8> bg0_buffer{};
+   std::array<std::uint16_t, 256 / 8 * 256 / 8> bg1_buffer{};
+   std::ranges::fill(bg0_buffer, blank_tile);
+   std::ranges::fill(bg1_buffer, blank_tile);
+   bool move_showing = false;
    while (true) {
       // wait for vblank to end
       while ((*(volatile std::uint16_t*)(0x4000004) & 1)) {}
@@ -244,6 +259,56 @@ int main()
       }
       else if (keypad.down_pressed()) {
          snake_y += 1;
+      }
+      if (keypad.a_pressed()) {
+         if (move_showing) {
+            // clear out the move location
+            std::ranges::fill(bg0_buffer, blank_tile);
+            std::ranges::fill(bg1_buffer, blank_tile);
+            gba::dma3_fill(bg0_base, bg0_base + 256 / 8 * 256 / 8, blank_tile);
+            gba::dma3_fill(bg1_base, bg1_base + 256 / 8 * 256 / 8, blank_tile);
+            move_showing = false;
+         }
+         else {
+            constexpr auto start_indic = 26;
+            for (int y = 0; y < info_height; ++y) {
+               for (int x = 0; x < info_width; ++x) {
+                  // only show movement on walkable tiles
+                  if (map_walkable[x + y * info_width]) {
+                     const auto tile_x = (96 + x * 16 + y * 16) / 8;
+                     const auto tile_y = (64 + 8 * y - 8 * x - 8 * map_height_data[x + y * info_width]) / 8;
+                     auto& buffer = map_priority[x + y * info_width] == 0 ? bg0_buffer : bg1_buffer;
+                     // TODO: This works, but feels really messy
+                     //       There's probably a better way to do it
+                     // write the tile information
+                     if (buffer[tile_x + tile_y * 256 / 8] == blank_tile) {
+                        buffer[tile_x + 0 + tile_y * 256 / 8] = start_indic;
+                        buffer[tile_x + 1 + tile_y * 256 / 8] = start_indic + 1;
+                     }
+                     else {
+                        buffer[tile_x + 0 + tile_y * 256 / 8] = start_indic + 8;
+                        buffer[tile_x + 1 + tile_y * 256 / 8] = start_indic + 9;
+                     }
+                     buffer[tile_x + 2 + tile_y * 256 / 8] = start_indic + 2;
+                     buffer[tile_x + 3 + tile_y * 256 / 8] = start_indic + 3;
+                     if (buffer[tile_x + (tile_y + 1) * 256 / 8] == blank_tile) {
+                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = start_indic + 4;
+                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = start_indic + 5;
+                     }
+                     else {
+                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = start_indic + 10;
+                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = start_indic + 11;
+                     }
+                     buffer[tile_x + 2 + (tile_y + 1) * 256 / 8] = start_indic + 6;
+                     buffer[tile_x + 3 + (tile_y + 1) * 256 / 8] = start_indic + 7;
+                  }
+               }
+            }
+            // copy the buffers over
+            gba::dma3_copy(std::begin(bg0_buffer), std::end(bg0_buffer), bg0_base);
+            gba::dma3_copy(std::begin(bg1_buffer), std::end(bg1_buffer), bg1_base);
+            move_showing = true;
+         }
       }
 
       snake_x = std::clamp(snake_x, 0, info_width - 1);
