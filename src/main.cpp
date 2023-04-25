@@ -9,8 +9,8 @@ int main()
 {
    using namespace gba::dma_opt;
    using namespace gba::lcd_opt;
-   std::uint16_t* bg_palettes = (std::uint16_t*)0x5000000;
-   std::uint32_t* tiles_data = (std::uint32_t*)0x6000000;
+   volatile std::uint16_t* bg_palettes = (std::uint16_t*)0x5000000;
+   volatile std::uint32_t* tiles_data = (std::uint32_t*)0x6000000;
    gba::dma3_copy(std::begin(font), std::end(font), tiles_data);
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), bg_palettes);
    // copy the font tiles and palette
@@ -24,8 +24,9 @@ int main()
                            .set(display_window_obj::off)
                            .set(obj_char_mapping::one_dimensional));
 
-   const auto bg1_loc
-      = [&](int x, int y) { return ((std::uint16_t*)((std::uint8_t*)tiles_data + 0x800 * 31 + x * 2 + y * 0x40)); };
+   const auto bg1_loc = [&](int x, int y) {
+      return ((volatile std::uint16_t*)((std::uint8_t*)tiles_data + 0x800 * 31 + x * 2 + y * 0x40));
+   };
 
    // TODO: Document these & make them options in gba.hpp
    //       This is setting video mode options
@@ -46,11 +47,13 @@ int main()
    write_it("0123456789`'\"~", 0, 3);
    write_it("012345678901234567890123456789", 0, 4);
    int scroll = 0;
-   std::uint16_t* bg1_x_scroll_loc = (std::uint16_t*)0x4000014;
+   volatile std::uint16_t* bg1_x_scroll_loc = (std::uint16_t*)0x4000014;
    gba::keypad_status keypad;
    while (true) {
-      // Wait for VBlank
-      while (*(volatile std::uint16_t*)(0x4000006) < 160) {}
+      // wait for vblank to end
+      while ((*(volatile std::uint16_t*)(0x4000004) & 1)) {}
+      // wait for vblank to start
+      while (!(*(volatile std::uint16_t*)(0x4000004) & 1)) {}
       keypad.update();
       if (keypad.left_held()) {
          scroll -= 1;

@@ -269,7 +269,7 @@ struct dma {
       *control() = to_set;
    }
 
-   void set_source(const void* ptr) const noexcept
+   void set_source(volatile const void* ptr) const noexcept
    {
       const auto value = reinterpret_cast<std::uint32_t>(ptr);
       if (num == 0) {
@@ -278,7 +278,9 @@ struct dma {
       *source_addr() = value;
    }
 
-   void set_destination(void* ptr) const noexcept
+   void set_source(const void* ptr) const noexcept { set_source(const_cast<volatile const void*>(ptr)); }
+
+   void set_destination(volatile void* ptr) const noexcept
    {
       const auto value = reinterpret_cast<std::uint32_t>(ptr);
       if (num != 3) {
@@ -286,6 +288,8 @@ struct dma {
       }
       *dest_addr() = value;
    }
+
+   void set_destination(void* ptr) const noexcept { set_destination(const_cast<volatile void*>(ptr)); }
 
    void set_word_count(int num_words) const noexcept
    {
@@ -333,7 +337,8 @@ struct lcd {
 
 constexpr detail::lcd lcd;
 
-inline std::uint32_t* dma3_copy(const std::uint32_t* start, const std::uint32_t* end, std::uint32_t* dest) noexcept
+inline volatile std::uint32_t*
+   dma3_copy(const std::uint32_t* start, const std::uint32_t* end, volatile std::uint32_t* dest) noexcept
 {
    using namespace gba::dma_opt;
    gba::dma3.set_source(start);
@@ -344,6 +349,29 @@ inline std::uint32_t* dma3_copy(const std::uint32_t* start, const std::uint32_t*
                             .set(dest_addr_cntrl::increment)
                             .set(repeat::off)
                             .set(transfer_type::bits_32)
+                            .set(start_timing::immediate)
+                            .set(irq::disable)
+                            .set(enable::on));
+   return dest + (end - start);
+}
+
+inline std::uint32_t* dma3_copy(const std::uint32_t* start, const std::uint32_t* end, std::uint32_t* dest) noexcept
+{
+   return const_cast<std::uint32_t*>(dma3_copy(start, end, const_cast<volatile std::uint32_t*>(dest)));
+}
+
+inline volatile std::uint16_t*
+   dma3_copy(const std::uint16_t* start, const std::uint16_t* end, volatile std::uint16_t* dest) noexcept
+{
+   using namespace gba::dma_opt;
+   gba::dma3.set_source(start);
+   gba::dma3.set_destination(dest);
+   gba::dma3.set_word_count(end - start);
+   gba::dma3.set_options(gba::dma_options{}
+                            .set(source_addr_cntrl::increment)
+                            .set(dest_addr_cntrl::increment)
+                            .set(repeat::off)
+                            .set(transfer_type::bits_16)
                             .set(start_timing::immediate)
                             .set(irq::disable)
                             .set(enable::on));
@@ -352,22 +380,10 @@ inline std::uint32_t* dma3_copy(const std::uint32_t* start, const std::uint32_t*
 
 inline std::uint16_t* dma3_copy(const std::uint16_t* start, const std::uint16_t* end, std::uint16_t* dest) noexcept
 {
-   using namespace gba::dma_opt;
-   gba::dma3.set_source(start);
-   gba::dma3.set_destination(dest);
-   gba::dma3.set_word_count(end - start);
-   gba::dma3.set_options(gba::dma_options{}
-                            .set(source_addr_cntrl::increment)
-                            .set(dest_addr_cntrl::increment)
-                            .set(repeat::off)
-                            .set(transfer_type::bits_16)
-                            .set(start_timing::immediate)
-                            .set(irq::disable)
-                            .set(enable::on));
-   return dest + (end - start);
+   return const_cast<std::uint16_t*>(dma3_copy(start, end, const_cast<volatile std::uint16_t*>(dest)));
 }
 
-inline void dma3_fill(std::uint32_t* start, std::uint32_t* end, std::uint32_t value) noexcept
+inline void dma3_fill(volatile std::uint32_t* start, volatile std::uint32_t* end, std::uint32_t value) noexcept
 {
    using namespace gba::dma_opt;
    gba::dma3.set_source(&value);
@@ -383,7 +399,12 @@ inline void dma3_fill(std::uint32_t* start, std::uint32_t* end, std::uint32_t va
                             .set(enable::on));
 }
 
-inline void dma3_fill(std::uint16_t* start, std::uint16_t* end, std::uint16_t value) noexcept
+inline void dma3_fill(std::uint32_t* start, std::uint32_t* end, std::uint32_t value) noexcept
+{
+   dma3_fill(const_cast<volatile std::uint32_t*>(start), const_cast<volatile std::uint32_t*>(end), value);
+}
+
+inline void dma3_fill(volatile std::uint16_t* start, volatile std::uint16_t* end, std::uint16_t value) noexcept
 {
    using namespace gba::dma_opt;
    gba::dma3.set_source(&value);
@@ -397,6 +418,11 @@ inline void dma3_fill(std::uint16_t* start, std::uint16_t* end, std::uint16_t va
                             .set(start_timing::immediate)
                             .set(irq::disable)
                             .set(enable::on));
+}
+
+inline void dma3_fill(std::uint16_t* start, std::uint16_t* end, std::uint16_t value) noexcept
+{
+   dma3_fill(const_cast<volatile std::uint16_t*>(start), const_cast<volatile std::uint16_t*>(end), value);
 }
 
 struct keypad_status {

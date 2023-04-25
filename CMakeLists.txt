@@ -9,8 +9,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 function(fix_gba_target target)
    add_custom_command(TARGET ${target} POST_BUILD
       COMMAND "${DEVKITARM_OBJCOPY}" -O binary "$<TARGET_FILE:${target}>" "$<TARGET_FILE:${target}>.gba"
-      COMMAND "${DEVKITPRO_GBAFIX}" "$<TARGET_FILE:${target}>.gba"
+      COMMAND "${DEVKITPRO_GBAFIX}" "$<TARGET_FILE:${target}>.gba" > /dev/null
       BYPRODUCTS "$<TARGET_FILE:${target}>.gba"
+      VERBATIM
    )
 endfunction()
 
@@ -48,20 +49,21 @@ function(process_image input_file output_name)
    add_custom_target(generate_${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
 endfunction()
 
-# I've had some weird errors/it not working unless it's release mode so warn if so
-if (NOT $<CONFIG:Release>)
-   message(WARN "Building in non-release mode! This may not function correctly.")
-endif()
-
 # We're always going to be GCC based so can just add these
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 add_executable(pekmun2 src/main.cpp)
 fix_gba_target(pekmun2)
 
+add_executable(scrolling cpp_experiments/scrolling.cpp)
+fix_gba_target(scrolling)
+
 # Include the build directory so generated files can be accessed
 target_include_directories(pekmun2 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(scrolling PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Process images
 process_image(font.png font)
 add_dependencies(pekmun2 generate_font)
+
+process_image(test_tileset.png test_tileset)
+add_dependencies(scrolling generate_test_tileset generate_font)
