@@ -60,10 +60,12 @@ int main()
    volatile std::uint16_t* bg_palettes = (std::uint16_t*)0x5000000;
    volatile std::uint32_t* tiles_data = (std::uint32_t*)0x6000000;
    volatile std::uint16_t* bg0_base = (std::uint16_t*)0x600F000;
+   volatile std::uint16_t* bg1_base = (std::uint16_t*)((std::uint8_t*)tiles_data + 0x800 * 31);
    const auto text_write_loc = gba::dma3_copy(std::begin(test_tileset), std::end(test_tileset), tiles_data);
    gba::dma3_copy(std::begin(test_tileset_pal), std::end(test_tileset_pal), bg_palettes);
    gba::dma3_copy(std::begin(font), std::end(font), text_write_loc);
    gba::dma3_fill(bg0_base, bg0_base + 256 / 8 * 256 / 8, blank_tile);
+   gba::dma3_fill(bg1_base, bg1_base + 256 / 8 * 256 / 8, blank_tile);
    *(volatile std::uint16_t*)(0x4000008) = 0b0001'1110'0000'0011;
    *(volatile std::uint16_t*)(0x400000A) = 0b0001'1111'0000'0010;
    const auto bg0_loc
@@ -103,6 +105,24 @@ int main()
    volatile std::uint16_t* bg1_y_scroll_loc = (std::uint16_t*)0x4000016;
    gba::keypad_status keypad;
    write_it("hello", 0, 0);
+   // initialize the map
+   const auto init_map = [&]() {
+      for (int y = 0; y != 20; ++y) {
+         const auto tile_y = y;
+         for (int x = 0; x != 30; ++x) {
+            const auto tile_x = x;
+            *bg1_loc(tile_x % (256 / 8), tile_y % (256 / 8)) = [&]() -> int {
+               if (tile_x >= map_width || tile_y >= map_height || tile_x < 0 || tile_y < 0) {
+                  return blank_tile;
+               }
+               else {
+                  return tiles[tile_x + tile_y * map_width];
+               };
+            }();
+         }
+      }
+   };
+   init_map();
    while (true) {
       // wait for vblank to end
       while ((*(volatile std::uint16_t*)(0x4000004) & 1)) {}
@@ -110,6 +130,7 @@ int main()
       while (!(*(volatile std::uint16_t*)(0x4000004) & 1)) {}
       keypad.update();
       if (keypad.start_pressed()) {
+         init_map();
          camera_x = 0;
          camera_y = 0;
       }
@@ -140,24 +161,37 @@ int main()
       const auto start_line = *(volatile std::uint16_t*)(0x4000006);
       const auto offset_x = camera_x / 8;
       const auto offset_y = camera_y / 8;
-      // TODO: Figure out how to update only the edges when scrolling
-      //       This doesn't scale to 4x layers very well
-      //       Alternatively, use DMA to transfer stuff when appropriate,
-      //       which also has its share of complications
-      //       Could potentially have a border of large enough size that DMA could
-      //       always be used?
-      for (int y = 0; y < 21; ++y) {
-         const auto tile_y = y + offset_y;
-         for (int x = 0; x < 31; ++x) {
+      // Run 4 times to see speed when doing this with 4 layers
+      for (int i = 0; i < 4; ++i) {
+         // Only the edges need to be updated (when scrolling <= 8px/frame)
+         for (auto y : {0, 20}) {
+            const auto tile_y = y + offset_y;
+            // TODO: This can be done with DMA (a bit complicated, but faster)
+            for (auto x = 0; x < 31; ++x) {
+               const auto tile_x = x + offset_x;
+               *bg1_loc(tile_x % (256 / 8), tile_y % (256 / 8)) = [&]() -> int {
+                  if (tile_x >= map_width || tile_y >= map_height || tile_x < 0 || tile_y < 0) {
+                     return blank_tile;
+                  }
+                  else {
+                     return tiles[tile_x + tile_y * map_width];
+                  };
+               }();
+            }
+         }
+         for (auto x : {0, 30}) {
             const auto tile_x = x + offset_x;
-            *bg1_loc(tile_x % (256 / 8), tile_y % (256 / 8)) = [&]() -> int {
-               if (tile_x >= map_width || tile_y >= map_height || tile_x < 0 || tile_y < 0) {
-                  return blank_tile;
-               }
-               else {
-                  return tiles[tile_x + tile_y * map_width];
-               };
-            }();
+            for (auto y = 0; y < 21; ++y) {
+               const auto tile_y = y + offset_y;
+               *bg1_loc(tile_x % (256 / 8), tile_y % (256 / 8)) = [&]() -> int {
+                  if (tile_x >= map_width || tile_y >= map_height || tile_x < 0 || tile_y < 0) {
+                     return blank_tile;
+                  }
+                  else {
+                     return tiles[tile_x + tile_y * map_width];
+                  };
+               }();
+            }
          }
       }
       const auto end_line = *(volatile std::uint16_t*)(0x4000006);
