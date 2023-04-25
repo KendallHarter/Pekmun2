@@ -4,6 +4,7 @@
 #include "generated/test_tileset.hpp"
 
 #include <charconv>
+#include <iterator>
 #include <utility>
 
 constexpr std::uint16_t tiles[] = {
