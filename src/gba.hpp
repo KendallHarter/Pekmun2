@@ -11,24 +11,27 @@
    // TODO: Improve this; currently just hangs if condition is true
    #define GBA_ASSERT(cond) \
       do {                  \
-         while (cond) {}    \
+         while (!(cond)) {} \
       } while (0)
 #endif
 
 namespace gba {
 
-constexpr bool is_internal_memory(std::uintptr_t loc) noexcept { return loc < 0x0800'0000; }
+inline constexpr bool is_internal_memory(std::uintptr_t loc) noexcept { return loc < 0x0800'0000; }
 
-constexpr bool is_external_memory(std::uintptr_t loc) noexcept { return loc >= 0x0800'0000 && loc < 0x1000'0000; }
+inline constexpr bool is_external_memory(std::uintptr_t loc) noexcept
+{
+   return loc >= 0x0800'0000 && loc < 0x1000'0000;
+}
 
-constexpr std::uintptr_t ewram_start{0x2000000};
-constexpr std::uintptr_t ewram_end{ewram_start + 0x40000};
+inline constexpr std::uintptr_t ewram_start{0x200'0000};
+inline constexpr std::uintptr_t ewram_end{ewram_start + 0x40000};
 
-constexpr std::uintptr_t iwram_start{0x4000000};
-constexpr std::uintptr_t iwram_end{iwram_start + 0x8000};
+inline constexpr std::uintptr_t iwram_start{0x400'0000};
+inline constexpr std::uintptr_t iwram_end{iwram_start + 0x8000};
 
-constexpr std::uintptr_t game_pack_start{0x8000000};
-constexpr std::uintptr_t game_pack_end{game_pack_start + 0x6000000};
+inline constexpr std::uintptr_t game_pack_start{0x800'0000};
+inline constexpr std::uintptr_t game_pack_end{game_pack_start + 0x600'0000};
 
 namespace lcd_opt {
 
@@ -318,7 +321,7 @@ namespace detail {
 struct lcd {
    void set_options(lcd_options opt) const noexcept
    {
-      volatile auto* control = reinterpret_cast<std::uint16_t*>(0x4000000);
+      volatile auto* control = reinterpret_cast<std::uint16_t*>(0x400'0000);
       auto to_set = *control;
       to_set &= opt.and_mask;
       to_set |= opt.or_mask;
@@ -329,6 +332,121 @@ struct lcd {
 } // namespace detail
 
 constexpr detail::lcd lcd;
+
+inline std::uint32_t* dma3_copy(const std::uint32_t* start, const std::uint32_t* end, std::uint32_t* dest) noexcept
+{
+   using namespace gba::dma_opt;
+   gba::dma3.set_source(start);
+   gba::dma3.set_destination(dest);
+   gba::dma3.set_word_count(end - start);
+   gba::dma3.set_options(gba::dma_options{}
+                            .set(source_addr_cntrl::increment)
+                            .set(dest_addr_cntrl::increment)
+                            .set(repeat::off)
+                            .set(transfer_type::bits_32)
+                            .set(start_timing::immediate)
+                            .set(irq::disable)
+                            .set(enable::on));
+   return dest + (end - start);
+}
+
+inline std::uint16_t* dma3_copy(const std::uint16_t* start, const std::uint16_t* end, std::uint16_t* dest) noexcept
+{
+   using namespace gba::dma_opt;
+   gba::dma3.set_source(start);
+   gba::dma3.set_destination(dest);
+   gba::dma3.set_word_count(end - start);
+   gba::dma3.set_options(gba::dma_options{}
+                            .set(source_addr_cntrl::increment)
+                            .set(dest_addr_cntrl::increment)
+                            .set(repeat::off)
+                            .set(transfer_type::bits_16)
+                            .set(start_timing::immediate)
+                            .set(irq::disable)
+                            .set(enable::on));
+   return dest + (end - start);
+}
+
+inline void dma3_fill(std::uint32_t* start, std::uint32_t* end, std::uint32_t value) noexcept
+{
+   using namespace gba::dma_opt;
+   gba::dma3.set_source(&value);
+   gba::dma3.set_destination(start);
+   gba::dma3.set_word_count(end - start);
+   gba::dma3.set_options(gba::dma_options{}
+                            .set(source_addr_cntrl::fixed)
+                            .set(dest_addr_cntrl::increment)
+                            .set(repeat::off)
+                            .set(transfer_type::bits_32)
+                            .set(start_timing::immediate)
+                            .set(irq::disable)
+                            .set(enable::on));
+}
+
+inline void dma3_fill(std::uint16_t* start, std::uint16_t* end, std::uint16_t value) noexcept
+{
+   using namespace gba::dma_opt;
+   gba::dma3.set_source(&value);
+   gba::dma3.set_destination(start);
+   gba::dma3.set_word_count(end - start);
+   gba::dma3.set_options(gba::dma_options{}
+                            .set(source_addr_cntrl::fixed)
+                            .set(dest_addr_cntrl::increment)
+                            .set(repeat::off)
+                            .set(transfer_type::bits_16)
+                            .set(start_timing::immediate)
+                            .set(irq::disable)
+                            .set(enable::on));
+}
+
+struct keypad_status {
+   void update()
+   {
+      raw_val_prev = raw_val;
+      raw_val = *(std::uint16_t*)(0x4000130);
+   }
+
+   // TODO: Better name?
+   // Pressed series only returns true if the key is newly pressed
+   bool a_pressed() const { return pressed_impl(0); }
+   bool b_pressed() const { return pressed_impl(1); }
+   bool select_pressed() const { return pressed_impl(2); }
+   bool start_pressed() const { return pressed_impl(3); }
+   bool right_pressed() const { return pressed_impl(4); }
+   bool left_pressed() const { return pressed_impl(5); }
+   bool up_pressed() const { return pressed_impl(6); }
+   bool down_pressed() const { return pressed_impl(7); }
+   bool r_pressed() const { return pressed_impl(8); }
+   bool l_pressed() const { return pressed_impl(9); }
+
+   bool a_held() const { return held_impl(0); }
+   bool b_held() const { return held_impl(1); }
+   bool select_held() const { return held_impl(2); }
+   bool start_held() const { return held_impl(3); }
+   bool right_held() const { return held_impl(4); }
+   bool left_held() const { return held_impl(5); }
+   bool up_held() const { return held_impl(6); }
+   bool down_held() const { return held_impl(7); }
+   bool r_held() const { return held_impl(8); }
+   bool l_held() const { return held_impl(9); }
+
+private:
+   bool pressed_impl(int bit_no) const
+   {
+      const std::uint16_t mask = 1 << bit_no;
+      // if previously not pressed but now pressed
+      return (((raw_val_prev & mask) != 0)) && ((raw_val & mask) == 0);
+   }
+
+   bool held_impl(int bit_no) const
+   {
+      const std::uint16_t mask = 1 << bit_no;
+      return (raw_val_prev & mask) == 0;
+   }
+
+   std::uint16_t raw_val_prev{0xFFFF};
+   std::uint16_t raw_val{0xFFFF};
+};
 
 } // namespace gba
 

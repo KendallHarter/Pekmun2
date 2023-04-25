@@ -54,7 +54,7 @@ map_walkable = [
    [1, 0, 1]
 ]
 
-def clamp(n, smallest, largest): 
+def clamp(n, smallest, largest):
    return max(smallest, min(n, largest))
 
 def main():
@@ -67,7 +67,7 @@ def main():
    move_layer_1 = []
 
    def draw_snake():
-      screen.blit(snake, (108 + snake_x * 16 + snake_y * 16, 56 + snake_y * 8 - 8 * snake_x - 8 * map_height_data[snake_y][snake_x]))
+      screen.blit(snake, (104 + snake_x * 16 + snake_y * 16, 42 + snake_y * 8 - 8 * snake_x - 8 * map_height_data[snake_y][snake_x]))
 
    def draw_cursor():
       screen.blit(cursor, (96 + cursor_x * 16 + cursor_y * 16, 47 + cursor_y * 8 - 8 * cursor_x - 8 * map_height_data[cursor_y][cursor_x]))
@@ -76,7 +76,7 @@ def main():
       for event in pygame.event.get():
          if event.type == pygame.QUIT:
             sys.exit()
-            
+
       keys = pygame.key.get_pressed()
       if keys[pygame.K_LEFT]:
          cursor_x -= 1
@@ -127,7 +127,7 @@ def main():
          draw_cursor()
       if snake_priority == 1:
          draw_snake()
-      
+
       pygame.display.flip()
       pygame.time.wait(50)
 
