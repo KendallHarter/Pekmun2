@@ -76,7 +76,7 @@ int main()
    };
    const auto write_it = [&](const char* c, int x, int y) {
       for (int i = 0; c[i] != '\0'; ++i) {
-         *bg0_loc(x + i, y) = c[i] + 26;
+         *bg0_loc(x + i, y) = c[i] + std::size(test_tileset) / 8;
       }
    };
    for (int y = 0; y < 20; ++y) {

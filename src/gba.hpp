@@ -1,7 +1,6 @@
 #ifndef GBA_HPP
 #define GBA_HPP
 
-#include <concepts>
 #include <cstdint>
 #include <span>
 
