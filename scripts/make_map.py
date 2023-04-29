@@ -29,6 +29,8 @@ class Map:
    #     A tile of higher priority and height is to the upper-right [x + 1] (maybe?)
    #     A tile of lower height is to the upper-left [y - 1]
    def tile_is_high_priority(self, x, y):
+      if x < 0 or x >= self.INPUT_WIDTH or y < 0 or y >= self.INPUT_HEIGHT:
+         return False
       if x < self.INPUT_WIDTH - 1:
          if self.HEIGHT_INPUT[y][x + 1] < self.HEIGHT_INPUT[y][x]:
             return True
@@ -42,22 +44,19 @@ class Map:
    # A tile is high sprite priority if it is tile high priority or:
    #     A tile to the upper-left is tile high priority [y - 1]
    #     A tile to the upper-right is tile high priority [x + 1]
-   #     A tile above one or two tiles is tile high priority [x + n, y - n]
+   #     A tile above one is tile high priority [x + 1, y - 1]
    #     A tile one to the upper-left and two to the upper-right is tile high priority [y - 1, x + 2]
    def tile_is_sprite_priority(self, x, y):
       if self.tile_is_high_priority(x, y):
          return True
-      elif y > 0 and self.tile_is_high_priority(x, y - 1):
+      elif self.tile_is_high_priority(x, y - 1):
          return True
-      elif x < self.INPUT_WIDTH - 1 and self.tile_is_high_priority(x + 1, y):
+      elif self.tile_is_high_priority(x + 1, y):
          return True
-      elif y - 1 > 0 and x + 2 < self.INPUT_WIDTH - 1 and self.tile_is_high_priority(x + 2, y - 1):
+      elif self.tile_is_high_priority(x + 2, y - 1):
          return True
-      for y_off in range(1, 3):
-         for x_off in range(1, 3):
-            if y - y_off > 0 and x + x_off < self.INPUT_WIDTH:
-               if self.tile_is_high_priority(x + x_off, y - y_off):
-                  return True
+      elif self.tile_is_high_priority(x + 1, y - 1):
+         return True
       return False
 
 def main():

@@ -27,6 +27,8 @@ def main():
    move_indic = pygame.image.load('../assets/py_move_indicator.png')
    move_indic.set_colorkey(move_indic.get_at((0, 0)))
 
+   test_square = pygame.image.load('../assets/py_test_sprite.png')
+
    my_font = pygame.font.SysFont('Consolas', 12)
 
    y_adj = -24
@@ -40,7 +42,7 @@ def main():
          [True,  False, False, False, False],
          [True,  True,  True,  False, False],
          [True,  True,  True,  False, False],
-         [True,  False, False, False, False],
+         [True,  True, False, False, False],
          [False, False, False, False, False]
       ]
 
@@ -48,7 +50,7 @@ def main():
          [True,  False, False, False, False],
          [True,  True,  True,  False, False],
          [True,  True,  True,  False, False],
-         [True,  False, False, False, False],
+         [True,  True, False, False, False],
          [False, False, False, False, False]
       ]
 
@@ -99,6 +101,8 @@ def main():
    selected = False
    move_layer_0 = []
    move_layer_1 = []
+   sprite_layer_0 = []
+   sprite_layer_1 = []
    camera_x = 0
    camera_y = 0
 
@@ -116,6 +120,9 @@ def main():
    def draw_cursor():
       screen.blit(cursor, (cursor_x * 16 + cursor_y * 16 - camera_x, y_adj + y_offset * 8 + 7 + cursor_y * 8 - 8 * cursor_x - 8 * map_height_data[cursor_y][cursor_x] - camera_y))
 
+   def draw_test_square(x, y):
+      screen.blit(test_square, (8 + x * 16 + y * 16 - camera_x, y_adj + y_offset * 8 + y * 8 - 8 * x - 8 * map_height_data[y][x] - camera_y))
+
    while True:
       for event in pygame.event.get():
          if event.type == pygame.QUIT:
@@ -131,17 +138,20 @@ def main():
       elif keys[pygame.K_DOWN]:
          cursor_y += 1
 
-      if keys[pygame.K_w]:
-         camera_y -= 4
-      elif keys[pygame.K_s]:
-         camera_y += 4
-      if keys[pygame.K_a]:
-         camera_x -= 4
-      elif keys[pygame.K_d]:
-         camera_x += 4
+      # if keys[pygame.K_w]:
+      #    camera_y -= 4
+      # elif keys[pygame.K_s]:
+      #    camera_y += 4
+      # if keys[pygame.K_a]:
+      #    camera_x -= 4
+      # elif keys[pygame.K_d]:
+      #    camera_x += 4
 
       cursor_x = clamp(cursor_x, 0, data_width - 1)
       cursor_y = clamp(cursor_y, 0, data_height - 1)
+
+      camera_x = 32 + -SCREEN_WIDTH / 2 + cursor_x * 16 + cursor_y * 16
+      camera_y = 32 + -SCREEN_HEIGHT / 2 + y_adj + y_offset * 8 + cursor_y * 8 - 8 * cursor_x - 8 * map_height_data[cursor_y][cursor_x]
 
       if keys[pygame.K_z]:
          if not selected and cursor_x == snake_x and cursor_y == snake_y:
@@ -161,6 +171,27 @@ def main():
                move_layer_1 = []
                selected = False
 
+      if keys[pygame.K_x]:
+         if sprite_priority[cursor_y][cursor_x] == 0:
+            # If there's a sprite of higher priority above we need to put this in higher priority instead
+            add_to = sprite_layer_0
+            if (cursor_x + 1, cursor_y - 1) in sprite_layer_1:
+               add_to = sprite_layer_1
+            if (cursor_x, cursor_y) not in add_to:
+               add_to.append((cursor_x, cursor_y))
+               add_to.sort(key=lambda x: x[1])
+         else:
+            # If there's a sprite of lower priority in the square below we need to raise its priority
+            try:
+               index = sprite_layer_0.index((cursor_x - 1, cursor_y + 1))
+               del sprite_layer_0[index]
+               sprite_layer_1.append((cursor_x - 1, cursor_y + 1))
+            except ValueError:
+               pass
+            if (cursor_x, cursor_y) not in sprite_layer_1:
+               sprite_layer_1.append((cursor_x, cursor_y))
+               sprite_layer_1.sort(key=lambda x: x[1])
+
       snake_priority = sprite_priority[snake_y][snake_x]
       cursor_priority = sprite_priority[cursor_y][cursor_x]
 
@@ -170,6 +201,8 @@ def main():
          screen.blit(move_indic, (x * 16 + y * 16 - camera_x, y_adj + y_offset * 8 + 24 + 8 * y - 8 * x - 8 * map_height_data[y][x] - camera_y))
       if cursor_priority == 0:
          draw_cursor()
+      for x, y in sprite_layer_0:
+         draw_test_square(x, y)
       if snake_priority == 0:
          draw_snake()
 
@@ -178,11 +211,13 @@ def main():
          screen.blit(move_indic, (x * 16 + y * 16 - camera_x, y_adj + y_offset * 8 + 24 + 8 * y - 8 * x - 8 * map_height_data[y][x] - camera_y))
       if cursor_priority == 1:
          draw_cursor()
+      for x, y in sprite_layer_1:
+         draw_test_square(x, y)
       if snake_priority == 1:
          draw_snake()
 
-      # screen.blit(my_font.render(f'{map_layer_data[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 0))
-      screen.blit(my_font.render(f'{cursor_x}, {cursor_y}', False, (0, 0, 0)), (0, 0))
+      screen.blit(my_font.render(f'{sprite_priority[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 0))
+      screen.blit(my_font.render(f'{cursor_x}, {cursor_y}', False, (0, 0, 0)), (0, 12))
 
       pygame.display.flip()
       pygame.time.wait(50)
