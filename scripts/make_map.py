@@ -77,7 +77,7 @@ def main():
    low_priority = [BLANK_TILE] * MAP_HEIGHT * MAP_WIDTH
    high_priority = [BLANK_TILE] * MAP_HEIGHT * MAP_WIDTH
 
-   # Find the lowest height the y-offset is known
+   # Find the lowest height so the y-offset is known
    # The lowest x-offset is always 0
    min_y = float('inf')
    max_y = float('-inf')

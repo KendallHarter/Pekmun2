@@ -238,8 +238,8 @@ int main()
    gba::keypad_status keypad;
    std::array<std::uint16_t, 256 / 8 * 256 / 8> bg0_buffer{};
    std::array<std::uint16_t, 256 / 8 * 256 / 8> bg1_buffer{};
-   std::ranges::fill(bg0_buffer, blank_tile);
-   std::ranges::fill(bg1_buffer, blank_tile);
+   gba::dma3_fill(bg0_buffer.begin(), bg0_buffer.end(), blank_tile);
+   gba::dma3_fill(bg1_buffer.begin(), bg1_buffer.end(), blank_tile);
    bool move_showing = false;
    while (true) {
       // wait for vblank to end
@@ -263,8 +263,8 @@ int main()
       if (keypad.a_pressed()) {
          if (move_showing) {
             // clear out the move location
-            std::ranges::fill(bg0_buffer, blank_tile);
-            std::ranges::fill(bg1_buffer, blank_tile);
+            gba::dma3_fill(bg0_buffer.begin(), bg0_buffer.end(), blank_tile);
+            gba::dma3_fill(bg1_buffer.begin(), bg1_buffer.end(), blank_tile);
             gba::dma3_fill(bg0_base, bg0_base + 256 / 8 * 256 / 8, blank_tile);
             gba::dma3_fill(bg1_base, bg1_base + 256 / 8 * 256 / 8, blank_tile);
             move_showing = false;
@@ -277,30 +277,31 @@ int main()
                   if (map_walkable[x + y * info_width]) {
                      const auto tile_x = (96 + x * 16 + y * 16) / 8;
                      const auto tile_y = (64 + 8 * y - 8 * x - 8 * map_height_data[x + y * info_width]) / 8;
+                     constexpr auto palette_1 = 1 << 12;
                      auto& buffer = map_priority[x + y * info_width] == 0 ? bg0_buffer : bg1_buffer;
                      // TODO: This works, but feels really messy
                      //       There's probably a better way to do it
                      // write the tile information
                      if (buffer[tile_x + tile_y * 256 / 8] == blank_tile) {
-                        buffer[tile_x + 0 + tile_y * 256 / 8] = start_indic;
-                        buffer[tile_x + 1 + tile_y * 256 / 8] = start_indic + 1;
+                        buffer[tile_x + 0 + tile_y * 256 / 8] = start_indic | palette_1;
+                        buffer[tile_x + 1 + tile_y * 256 / 8] = (start_indic + 1) | palette_1;
                      }
                      else {
-                        buffer[tile_x + 0 + tile_y * 256 / 8] = start_indic + 8;
-                        buffer[tile_x + 1 + tile_y * 256 / 8] = start_indic + 9;
+                        buffer[tile_x + 0 + tile_y * 256 / 8] = (start_indic + 8) | palette_1;
+                        buffer[tile_x + 1 + tile_y * 256 / 8] = (start_indic + 9) | palette_1;
                      }
-                     buffer[tile_x + 2 + tile_y * 256 / 8] = start_indic + 2;
-                     buffer[tile_x + 3 + tile_y * 256 / 8] = start_indic + 3;
+                     buffer[tile_x + 2 + tile_y * 256 / 8] = (start_indic + 2) | palette_1;
+                     buffer[tile_x + 3 + tile_y * 256 / 8] = (start_indic + 3) | palette_1;
                      if (buffer[tile_x + (tile_y + 1) * 256 / 8] == blank_tile) {
-                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = start_indic + 4;
-                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = start_indic + 5;
+                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = (start_indic + 4) | palette_1;
+                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = (start_indic + 5) | palette_1;
                      }
                      else {
-                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = start_indic + 10;
-                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = start_indic + 11;
+                        buffer[tile_x + 0 + (tile_y + 1) * 256 / 8] = (start_indic + 10) | palette_1;
+                        buffer[tile_x + 1 + (tile_y + 1) * 256 / 8] = (start_indic + 11) | palette_1;
                      }
-                     buffer[tile_x + 2 + (tile_y + 1) * 256 / 8] = start_indic + 6;
-                     buffer[tile_x + 3 + (tile_y + 1) * 256 / 8] = start_indic + 7;
+                     buffer[tile_x + 2 + (tile_y + 1) * 256 / 8] = (start_indic + 6) | palette_1;
+                     buffer[tile_x + 3 + (tile_y + 1) * 256 / 8] = (start_indic + 7) | palette_1;
                   }
                }
             }
