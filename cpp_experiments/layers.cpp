@@ -270,7 +270,7 @@ int main()
             move_showing = false;
          }
          else {
-            constexpr auto start_indic = 26;
+            constexpr auto start_indic = std::size(test_tileset) / 8;
             for (int y = 0; y < info_height; ++y) {
                for (int x = 0; x < info_width; ++x) {
                   // only show movement on walkable tiles

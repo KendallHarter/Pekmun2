@@ -22,30 +22,50 @@ WALKABLE_INPUT = [
 INPUT_WIDTH = len(HEIGHT_INPUT[0])
 INPUT_HEIGHT = len(HEIGHT_INPUT)
 
-def clamp(n, smallest, largest):
-   return max(smallest, min(n, largest))
-
+assert len(HEIGHT_INPUT) == len(WALKABLE_INPUT)
+assert len(HEIGHT_INPUT[0]) == len(WALKABLE_INPUT[0])
 
 # This priority is for the tiles themselves, the sprite priority map
 # is somewhat different
-# TODO: Determine if the above is actually true
 # A tile needs to be on a higher priority layer if:
 #     A tile of lower height is to the upper-right [x + 1]
-#     A tile of higher priority and height is to the upper-right [x + 1]
+#     A tile of higher priority and height is to the upper-right [x + 1] (maybe?)
 #     A tile of lower height is to the upper-left [y - 1]
 def tile_is_high_priority(x, y):
    if x < INPUT_WIDTH - 1:
-      if HEIGHT_INPUT[y][x + 1] < HEIGHT_INPUT[y][x] or HEIGHT_INPUT[y][x + 1] > HEIGHT_INPUT[y][x] and tile_is_high_priority(x + 1, y):
+      if HEIGHT_INPUT[y][x + 1] < HEIGHT_INPUT[y][x]:
          return True
+      # elif HEIGHT_INPUT[y][x + 1] > HEIGHT_INPUT[y][x] and tile_is_high_priority(x + 1, y):
+      #    return True
    if y > 0 and HEIGHT_INPUT[y - 1][x] < HEIGHT_INPUT[y][x]:
       return True
    return False
 
 
+# A tile is high sprite priority if it is tile high priority or:
+#     A tile to the upper-left is tile high priority [y - 1]
+#     A tile to the upper-right is tile high priority [x + 1]
+#     A tile above one or two tiles is tile high priority [x + n, y - n]
+#     A tile one to the upper-left and two to the upper-right is tile high priority [y - 1, x + 2]
+def tile_is_sprite_priority(x, y):
+   if tile_is_high_priority(x, y):
+      return True
+   elif y > 0 and tile_is_high_priority(x, y - 1):
+      return True
+   elif x < INPUT_WIDTH - 1 and tile_is_high_priority(x + 1, y):
+      return True
+   elif y - 1 > 0 and x + 2 < INPUT_WIDTH - 1 and tile_is_high_priority(x + 2, y - 1):
+      return True
+   for i in range(1, 3):
+      if y - i > 0 and x + i < INPUT_WIDTH - 1:
+         if tile_is_high_priority(x + i, y - i):
+            return True
+   return False
+
 def main():
    BLANK_TILE = 18
-   MAP_WIDTH = 30
-   MAP_HEIGHT = 20
+   MAP_WIDTH = 60
+   MAP_HEIGHT = 40
    low_priority = [BLANK_TILE] * MAP_HEIGHT * MAP_WIDTH
    high_priority = [BLANK_TILE] * MAP_HEIGHT * MAP_WIDTH
 
@@ -58,6 +78,7 @@ def main():
          min_y = min(min_y, tile_y)
 
    y_offset = -min_y
+   print(f'size: {INPUT_WIDTH}x{INPUT_HEIGHT}')
    print(f'y offset: {y_offset}')
    for y in range(INPUT_HEIGHT):
       for x in range(INPUT_WIDTH):
@@ -77,8 +98,28 @@ def main():
                   adjust_layer[tile_x + tile_y * MAP_WIDTH + i] = i + 9
             for i in range(4):
                adjust_layer[tile_x + (tile_y + 1) * MAP_WIDTH + i] = i + 22
+            # write the columns (only on the low priority layer)
+            if adjust_layer is low_priority:
+               for i in range(HEIGHT_INPUT[y][x] - 1):
+                  if adjust_layer[tile_x + (tile_y + i + 2) * MAP_WIDTH] == BLANK_TILE:
+                     adjust_layer[tile_x + (tile_y + i + 2) * MAP_WIDTH] = 19
+                     adjust_layer[tile_x + (tile_y + i + 2) * MAP_WIDTH + 1] = 19
+                     adjust_layer[tile_x + (tile_y + i + 2) * MAP_WIDTH + 2] = 19
+                     adjust_layer[tile_x + (tile_y + i + 2) * MAP_WIDTH + 3] = 19
+            # Write the bottom on corner tiles
+            y_off = HEIGHT_INPUT[y][x] - 1 + 2
+            if x == 0:
+               if adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH] == BLANK_TILE:
+                  adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH] = 14
+                  adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH + 1] = 15
+            if y == INPUT_HEIGHT - 1:
+               if adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH + 2] == BLANK_TILE:
+                  adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH + 2] = 16
+                  adjust_layer[tile_x + (tile_y + y_off) * MAP_WIDTH + 3] = 17
 
    # Emulate the Tiled file format
+   # It discards extra fields when edited so a separate file will be needed for the
+   # height / priority maps
    output = {
       'compressionlevel': -1,
       'height': MAP_HEIGHT,
@@ -137,6 +178,8 @@ def main():
    with open('../assets/test_output.json', 'w') as f:
       f.write(json.dumps(output))
 
+   sprite_priority = [[tile_is_sprite_priority(x, y) for x in range(INPUT_WIDTH)] for y in range(INPUT_HEIGHT)]
+   print(sprite_priority)
 
 def to_cpp_array(a_list: list[int]) -> str:
    return str(a_list).replace("[", "{").replace("]", "};")

@@ -32,7 +32,7 @@
          "width":30,
          "x":0,
          "y":0
-        }, 
+        },
         {
          "data":[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -72,18 +72,18 @@
  "tileheight":8,
  "tilesets":[
         {
-         "columns":26,
+         "columns":27,
          "firstgid":1,
          "image":"test_tileset.png",
          "imageheight":8,
-         "imagewidth":208,
+         "imagewidth":216,
          "margin":0,
          "name":"test",
          "spacing":0,
-         "tilecount":26,
+         "tilecount":27,
          "tileheight":8,
          "tilewidth":8,
-         "transparentcolor":"#ff0004"
+         "transparentcolor":"#2b44ff"
         }],
  "tilewidth":8,
  "type":"map",
