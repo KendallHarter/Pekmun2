@@ -218,6 +218,7 @@ def main():
 
       screen.blit(my_font.render(f'{sprite_priority[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 0))
       screen.blit(my_font.render(f'{cursor_x}, {cursor_y}', False, (0, 0, 0)), (0, 12))
+      screen.blit(my_font.render(f'camera: {camera_x}, {camera_y}', False, (0, 0, 0)), (0, 24))
 
       pygame.display.flip()
       pygame.time.wait(50)

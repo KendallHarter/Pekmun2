@@ -102,8 +102,6 @@ int main()
                            .set(obj_char_mapping::one_dimensional));
    int camera_x = 0;
    int camera_y = 0;
-   volatile std::uint16_t* bg1_x_scroll_loc = (std::uint16_t*)0x4000014;
-   volatile std::uint16_t* bg1_y_scroll_loc = (std::uint16_t*)0x4000016;
    gba::keypad_status keypad;
    write_it("hello", 0, 0);
    // initialize the map
@@ -157,8 +155,7 @@ int main()
       if (camera_y < 0) {
          camera_y = 0;
       }
-      *bg1_x_scroll_loc = camera_x;
-      *bg1_y_scroll_loc = camera_y;
+      gba::bg1.set_scroll(camera_x, camera_y);
       const auto start_line = *(volatile std::uint16_t*)(0x4000006);
       const auto offset_x = camera_x / 8;
       const auto offset_y = camera_y / 8;

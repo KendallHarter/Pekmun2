@@ -5,6 +5,7 @@
 #include "generated/test_tileset.hpp"
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 
 constexpr std::uint16_t tiles_0[] = {

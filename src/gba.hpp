@@ -2,7 +2,6 @@
 #define GBA_HPP
 
 #include <cstdint>
-#include <span>
 
 #ifdef NDEBUG
    #define GBA_ASSERT(cond) (void)(cond)
@@ -155,6 +154,89 @@ enum class enable {
 
 } // namespace dma_opt
 
+namespace bg_opt {
+
+enum class priority {
+   p0,
+   p1,
+   p2,
+   p3
+};
+
+/// @brief This is the offset to BG tile data
+enum class char_base_block {
+   b0,
+   b16,
+   b32,
+   b48
+};
+
+enum class mosaic {
+   disable,
+   enable
+};
+
+enum class colors_palettes {
+   c16_p16,
+   c256_p1
+};
+
+// TODO: Is there a better way of representing this?
+/// @brief This is the offset to BG map data
+enum class screen_base_block {
+   b0,
+   b2,
+   b4,
+   b6,
+   b8,
+   b10,
+   b12,
+   b14,
+   b16,
+   b18,
+   b20,
+   b22,
+   b24,
+   b26,
+   b28,
+   b30,
+   b32,
+   b34,
+   b36,
+   b38,
+   b40,
+   b42,
+   b44,
+   b46,
+   b48,
+   b50,
+   b52,
+   b54,
+   b56,
+   b58,
+   b60,
+   b62
+};
+
+enum class display_area_overflow {
+   transparent,
+   wraparound
+};
+
+enum class screen_size {
+   text_256x256,
+   text_512x256,
+   text_256x512,
+   text_512x512,
+
+   rot_scale_128x128 = 0,
+   rot_scale_256x256 = 1,
+   rot_scale_512x512 = 2,
+   rot_scale_1024x1024 = 3
+};
+
+} // namespace bg_opt
+
 namespace detail {
 struct dma_builder {};
 } // namespace detail
@@ -180,6 +262,17 @@ struct dma_builder {};
       set_field(shift, static_cast<int>(val) & 1);            \
       set_field(shift + 1, (static_cast<int>(val) >> 1) & 1); \
       set_field(shift + 2, (static_cast<int>(val) >> 2) & 1); \
+      return *this;                                           \
+   }
+
+#define MAKE_SET5(type, shift)                                \
+   constexpr self& set(MAKE_SET_NAMESPACE::type val) noexcept \
+   {                                                          \
+      set_field(shift, static_cast<int>(val) & 1);            \
+      set_field(shift, (static_cast<int>(val) >> 1) & 1);     \
+      set_field(shift, (static_cast<int>(val) >> 2) & 2);     \
+      set_field(shift, (static_cast<int>(val) >> 3) & 3);     \
+      set_field(shift, (static_cast<int>(val) >> 4) & 4);     \
       return *this;                                           \
    }
 
@@ -235,7 +328,6 @@ struct dma_options {
       or_mask |= base_value;
    }
 
-   // Two fields since may want to leave options untouched
    // The left-out bit is the to game pak option; which has no use to me
    std::uint16_t and_mask{0b1111'0111'1111'1111};
    std::uint16_t or_mask{0x0000};
@@ -243,8 +335,43 @@ struct dma_options {
 
 #undef MAKE_SET_NAMESPACE
 
+#define MAKE_SET_NAMESPACE bg_opt
+
+struct bg_options {
+   using self = bg_options;
+
+   MAKE_SET2(priority, 0)
+   MAKE_SET2(char_base_block, 2)
+   MAKE_SET(mosaic, 6)
+   MAKE_SET(colors_palettes, 7)
+   MAKE_SET5(screen_base_block, 8)
+   MAKE_SET(display_area_overflow, 13)
+   MAKE_SET2(screen_size, 14)
+
+   constexpr void set_field(int shift_amount, int value) noexcept
+   {
+      const std::uint16_t base_value = value << shift_amount;
+      and_mask &= base_value;
+      or_mask |= base_value;
+   }
+
+   // Left out bits are "must be 0"
+   std::uint16_t and_mask{0b1111'1111'1100'1111};
+   std::uint16_t or_mask{0x0000};
+};
+
+#undef MAKE_SET_NAMESPACE
+
 #undef MAKE_SET
 #undef MAKE_SET2
+#undef MAKE_SET3
+#undef MAKE_SET5
+
+namespace detail {
+struct preserve {};
+} // namespace detail
+
+inline constexpr detail::preserve preserve;
 
 struct dma {
    constexpr dma(int num, std::uintptr_t base_addr, detail::dma_builder) noexcept
@@ -255,7 +382,7 @@ struct dma {
       , control_raw{base_addr + 10}
    {}
 
-   void set_options(dma_options opt) const noexcept
+   void set_options(detail::preserve, dma_options opt) const noexcept
    {
       auto to_set = *control();
       to_set &= opt.and_mask;
@@ -266,6 +393,16 @@ struct dma {
          GBA_ASSERT(start_timing != 3);
       }
       *control() = to_set;
+   }
+
+   void set_options(dma_options opt) const noexcept
+   {
+      // This _shouldn't_ be needed, but apparently it is for some reason.
+      // Removing the dummy read causes this to not work, whereas it works
+      // just fine with it there.  I'm completely lost on this.
+      const auto dummy = *control();
+      (void)dummy;
+      *control() = opt.or_mask;
    }
 
    void set_source(volatile const void* ptr) const noexcept
@@ -322,7 +459,7 @@ constexpr dma dma3{3, 0x40000D4, detail::dma_builder{}};
 namespace detail {
 
 struct lcd {
-   void set_options(lcd_options opt) const noexcept
+   void set_options(detail::preserve, lcd_options opt) const noexcept
    {
       volatile auto* control = reinterpret_cast<std::uint16_t*>(0x400'0000);
       auto to_set = *control;
@@ -330,11 +467,97 @@ struct lcd {
       to_set |= opt.or_mask;
       *control = to_set;
    }
+
+   void set_options(lcd_options opt) const noexcept
+   {
+      volatile auto* control = reinterpret_cast<std::uint16_t*>(0x400'0000);
+      *control = opt.or_mask;
+   }
 };
 
 } // namespace detail
 
 constexpr detail::lcd lcd;
+
+namespace detail {
+
+struct bg_builder {};
+
+} // namespace detail
+
+struct bg {
+public:
+   constexpr bg(int num, detail::bg_builder) noexcept : num{num} {}
+
+   void set_options(detail::preserve, bg_options opt) const noexcept
+   {
+      auto to_set = *control_addr();
+      to_set &= opt.and_mask;
+      to_set |= opt.or_mask;
+      *control_addr() = to_set;
+   }
+
+   void set_options(bg_options opt) const noexcept { *control_addr() = opt.or_mask; }
+
+   void set_x_scroll(int x) const noexcept { *x_scroll_addr() = x; }
+
+   void set_y_scroll(int y) const noexcept { *y_scroll_addr() = y; }
+
+   void set_scroll(int x, int y) const noexcept
+   {
+      set_x_scroll(x);
+      set_y_scroll(y);
+   }
+
+private:
+   volatile std::uint16_t* control_addr() const noexcept
+   {
+      return reinterpret_cast<std::uint16_t*>(0x0400'0008 + num * 2);
+   }
+   volatile std::uint16_t* x_scroll_addr() const noexcept
+   {
+      return reinterpret_cast<std::uint16_t*>(0x0400'0010 + num * 4);
+   }
+   volatile std::uint16_t* y_scroll_addr() const noexcept
+   {
+      return reinterpret_cast<std::uint16_t*>(0x0400'0012 + num * 4);
+   }
+
+   int num;
+};
+
+inline constexpr bg bg0{0, detail::bg_builder{}};
+inline constexpr bg bg1{1, detail::bg_builder{}};
+inline constexpr bg bg2{2, detail::bg_builder{}};
+inline constexpr bg bg3{3, detail::bg_builder{}};
+
+inline constexpr volatile std::uint32_t* bg_char_loc(bg_opt::char_base_block opt) noexcept
+{
+   return reinterpret_cast<volatile std::uint32_t*>(0x600'000 + 0x4000 * static_cast<int>(opt));
+}
+
+inline constexpr volatile std::uint16_t* bg_screen_loc(bg_opt::screen_base_block opt) noexcept
+{
+   return reinterpret_cast<volatile std::uint16_t*>(0x600'000 + 0x800 * static_cast<int>(opt));
+}
+
+inline constexpr volatile std::uint16_t* bg_palette_addr(int num) noexcept
+{
+   return reinterpret_cast<volatile std::uint16_t*>(0x500'0000 + 32 * num);
+}
+
+inline constexpr volatile std::uint16_t* obj_palette_addr(int num) noexcept
+{
+   return reinterpret_cast<volatile std::uint16_t*>(0x500'0200 + 32 * num);
+}
+
+inline constexpr volatile std::uint32_t* obj_tile_addr(int bg_mode) noexcept
+{
+   if (bg_mode == 0 || bg_mode == 1 || bg_mode == 2) {
+      return reinterpret_cast<volatile std::uint32_t*>(0x601'0000);
+   }
+   return reinterpret_cast<volatile std::uint32_t*>(0x601'4000);
+}
 
 inline volatile std::uint32_t*
    dma3_copy(const std::uint32_t* start, const std::uint32_t* end, volatile std::uint32_t* dest) noexcept
@@ -428,7 +651,7 @@ struct keypad_status {
    void update()
    {
       raw_val_prev = raw_val;
-      raw_val = *(std::uint16_t*)(0x4000130);
+      raw_val = *(volatile std::uint16_t*)(0x4000130);
    }
 
    // TODO: Better name?
