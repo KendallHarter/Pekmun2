@@ -4,6 +4,8 @@ import json
 import sys
 import os
 
+# TODO: Is there a good way to have this be a configuration somewhere rather
+#       than a hard coded thing in two places?
 # Max input width; this is so map data can always be padded to the same length
 # for quick multiplication
 MAX_INPUT_WIDTH = 16
@@ -72,6 +74,7 @@ def main():
    the_map = Map(input_file)
 
    BLANK_TILE = 18
+   # TODO: Same as above; these are also hard-coded limits set in two different places
    MAP_WIDTH = 60
    MAP_HEIGHT = 40
    low_priority = [BLANK_TILE] * MAP_HEIGHT * MAP_WIDTH
@@ -189,8 +192,16 @@ def main():
       }]
    }
 
+   def try_get(lst, x, y):
+      try:
+         return lst[y][x]
+      except IndexError:
+         return 0
+
    sprite_priority = [[the_map.tile_is_sprite_priority(x, y) for x in range(MAX_INPUT_WIDTH)] for y in range(the_map.INPUT_HEIGHT)]
    tile_priority = [[the_map.tile_is_high_priority(x, y) for x in range(MAX_INPUT_WIDTH)] for y in range(the_map.INPUT_HEIGHT)]
+   adjusted_heights = [[try_get(the_map.HEIGHT_INPUT, x, y) for x in range(MAX_INPUT_WIDTH)] for y in range(the_map.INPUT_HEIGHT)]
+   adjusted_walkable = [[try_get(the_map.WALKABLE_INPUT, x, y) for x in range(MAX_INPUT_WIDTH)] for y in range(the_map.INPUT_HEIGHT)]
 
    output_dir = os.path.join('../assets/maps/', output_dir)
    os.makedirs(output_dir, exist_ok=True)
@@ -202,12 +213,10 @@ def main():
          'tile_priority': tile_priority,
          'height': the_map.INPUT_HEIGHT,
          'width': the_map.INPUT_WIDTH,
-         'y_offset': y_offset
+         'y_offset': y_offset,
+         'heights': adjusted_heights,
+         'walkable': adjusted_walkable
       }))
-
-def to_cpp_array(a_list: list[int]) -> str:
-   return str(a_list).replace("[", "{").replace("]", "};")
-
 
 if __name__ == "__main__":
    main()

@@ -21,7 +21,7 @@ def main():
    snake = pygame.image.load('../assets/snake.png')
    snake.set_colorkey(snake.get_at((0, 0)))
 
-   cursor = pygame.image.load('../assets/cursor.png')
+   cursor = pygame.image.load('../assets/py_cursor.png')
    cursor.set_colorkey(cursor.get_at((0, 0)))
 
    move_indic = pygame.image.load('../assets/py_move_indicator.png')

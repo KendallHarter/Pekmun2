@@ -1,6 +1,7 @@
 #ifndef GBA_HPP
 #define GBA_HPP
 
+#include <array>
 #include <cstdint>
 
 #ifdef NDEBUG
@@ -237,8 +238,161 @@ enum class screen_size {
 
 } // namespace bg_opt
 
+// TODO: There are some conflicting flags here that edit the same bits
+//       Is there a better way to abstract them and have them be consistent?
+namespace obj_opt {
+
+enum struct rot_scale {
+   enable,
+   disable
+};
+
+enum struct double_size {
+   enable,
+   disable
+};
+
+enum struct display {
+   enable,
+   disable
+};
+
+enum struct mode {
+   normal,
+   semi_transparent,
+   obj_window
+};
+
+enum struct mosaic {
+   disable,
+   enable
+};
+
+enum struct colors_pal {
+   c16_p16,
+   c256_p1
+};
+
+enum struct shape {
+   square,
+   horiztonal,
+   vertical
+};
+
+enum struct hflip {
+   disable,
+   enable
+};
+
+enum struct vflip {
+   disable,
+   enable
+};
+
+// TODO: Same as above, is there a better way to represent this?
+enum struct rot_scale_param {
+   p0,
+   p1,
+   p2,
+   p3,
+   p4,
+   p5,
+   p6,
+   p7,
+   p8,
+   p9,
+   p10,
+   p11,
+   p12,
+   p13,
+   p14,
+   p15,
+   p16,
+   p17,
+   p18,
+   p19,
+   p20,
+   p21,
+   p22,
+   p23,
+   p24,
+   p25,
+   p26,
+   p27,
+   p28,
+   p29,
+   p30,
+   p31
+};
+
+enum struct size {
+   s8x8,
+   s16x16,
+   s32x32,
+   s64x64,
+
+   h16x8 = 0,
+   h32x8 = 1,
+   h32x16 = 2,
+   h64x32 = 3,
+
+   v8x16 = 0,
+   v8x32 = 1,
+   v16x32 = 2,
+   v32x64 = 3
+};
+
+enum struct priority {
+   p0,
+   p1,
+   p2,
+   p3
+};
+
+enum struct palette_num {
+   p0,
+   p1,
+   p2,
+   p3,
+   p4,
+   p5,
+   p6,
+   p7,
+   p8,
+   p9,
+   p10,
+   p11,
+   p12,
+   p13,
+   p14,
+   p15
+};
+
+} // namespace obj_opt
+
 namespace detail {
 struct dma_builder {};
+
+template<std::uint16_t DefaultAndMask>
+struct opt_base {
+   constexpr void set_field(int shift_amount, int value) noexcept
+   {
+      const std::uint16_t base_value = value << shift_amount;
+      and_mask &= base_value;
+      or_mask |= base_value;
+   }
+
+   void apply_to(volatile std::uint16_t* addr) const noexcept
+   {
+      auto val = *addr;
+      val &= and_mask;
+      val |= or_mask;
+      *addr = val;
+   }
+
+   std::uint16_t and_mask{DefaultAndMask};
+   std::uint16_t or_mask{0x0000};
+};
 } // namespace detail
 
 #define MAKE_SET(type, shift)                                 \
@@ -252,7 +406,7 @@ struct dma_builder {};
    constexpr self& set(MAKE_SET_NAMESPACE::type val) noexcept \
    {                                                          \
       set_field(shift, static_cast<int>(val) & 1);            \
-      set_field(shift + 1, static_cast<int>(val) >> 1);       \
+      set_field(shift + 1, (static_cast<int>(val) >> 1) & 1); \
       return *this;                                           \
    }
 
@@ -265,20 +419,30 @@ struct dma_builder {};
       return *this;                                           \
    }
 
+#define MAKE_SET4(type, shift)                                \
+   constexpr self& set(MAKE_SET_NAMESPACE::type val) noexcept \
+   {                                                          \
+      set_field(shift, static_cast<int>(val) & 1);            \
+      set_field(shift + 1, (static_cast<int>(val) >> 1) & 1); \
+      set_field(shift + 2, (static_cast<int>(val) >> 2) & 1); \
+      set_field(shift + 3, (static_cast<int>(val) >> 3) & 1); \
+      return *this;                                           \
+   }
+
 #define MAKE_SET5(type, shift)                                \
    constexpr self& set(MAKE_SET_NAMESPACE::type val) noexcept \
    {                                                          \
       set_field(shift, static_cast<int>(val) & 1);            \
-      set_field(shift, (static_cast<int>(val) >> 1) & 1);     \
-      set_field(shift, (static_cast<int>(val) >> 2) & 2);     \
-      set_field(shift, (static_cast<int>(val) >> 3) & 3);     \
-      set_field(shift, (static_cast<int>(val) >> 4) & 4);     \
+      set_field(shift + 1, (static_cast<int>(val) >> 1) & 1); \
+      set_field(shift + 2, (static_cast<int>(val) >> 2) & 1); \
+      set_field(shift + 3, (static_cast<int>(val) >> 3) & 1); \
+      set_field(shift + 4, (static_cast<int>(val) >> 4) & 1); \
       return *this;                                           \
    }
 
 #define MAKE_SET_NAMESPACE lcd_opt
 
-struct lcd_options {
+struct lcd_options : detail::opt_base<0xFFFF> {
    using self = lcd_options;
 
    MAKE_SET3(bg_mode, 0)
@@ -294,23 +458,14 @@ struct lcd_options {
    MAKE_SET(display_window_0, 13)
    MAKE_SET(display_window_1, 14)
    MAKE_SET(display_window_obj, 15)
-
-   constexpr void set_field(int shift_amount, int value) noexcept
-   {
-      const std::uint16_t base_value = value << shift_amount;
-      and_mask &= base_value;
-      or_mask |= base_value;
-   }
-
-   std::uint16_t and_mask{0xFFFF};
-   std::uint16_t or_mask{0x0000};
 };
 
 #undef MAKE_SET_NAMESPACE
 
 #define MAKE_SET_NAMESPACE dma_opt
 
-struct dma_options {
+// The left-out bit is the to game pak option; which has no use to me
+struct dma_options : detail::opt_base<0b1111'0111'1111'1111> {
    using self = dma_options;
 
    MAKE_SET2(dest_addr_cntrl, 5)
@@ -320,24 +475,14 @@ struct dma_options {
    MAKE_SET2(start_timing, 12)
    MAKE_SET(irq, 14)
    MAKE_SET(enable, 15)
-
-   constexpr void set_field(int shift_amount, int value) noexcept
-   {
-      const std::uint16_t base_value = value << shift_amount;
-      and_mask &= base_value;
-      or_mask |= base_value;
-   }
-
-   // The left-out bit is the to game pak option; which has no use to me
-   std::uint16_t and_mask{0b1111'0111'1111'1111};
-   std::uint16_t or_mask{0x0000};
 };
 
 #undef MAKE_SET_NAMESPACE
 
 #define MAKE_SET_NAMESPACE bg_opt
 
-struct bg_options {
+// Left out bits are "must be 0"
+struct bg_options : detail::opt_base<0b1111'1111'1100'1111> {
    using self = bg_options;
 
    MAKE_SET2(priority, 0)
@@ -347,25 +492,47 @@ struct bg_options {
    MAKE_SET5(screen_base_block, 8)
    MAKE_SET(display_area_overflow, 13)
    MAKE_SET2(screen_size, 14)
-
-   constexpr void set_field(int shift_amount, int value) noexcept
-   {
-      const std::uint16_t base_value = value << shift_amount;
-      and_mask &= base_value;
-      or_mask |= base_value;
-   }
-
-   // Left out bits are "must be 0"
-   std::uint16_t and_mask{0b1111'1111'1100'1111};
-   std::uint16_t or_mask{0x0000};
 };
 
 #undef MAKE_SET_NAMESPACE
 
+#define MAKE_SET_NAMESPACE obj_opt
+
+struct obj_attr0_options : detail::opt_base<0xFFFF> {
+   using self = obj_attr0_options;
+
+   MAKE_SET(rot_scale, 8)
+   MAKE_SET(double_size, 9)
+   MAKE_SET(display, 9)
+   MAKE_SET2(mode, 10)
+   MAKE_SET(mosaic, 12)
+   MAKE_SET(colors_pal, 13)
+   MAKE_SET2(shape, 14)
+};
+
+struct obj_attr1_options : detail::opt_base<0xFFFF> {
+   using self = obj_attr1_options;
+
+   MAKE_SET5(rot_scale_param, 9)
+   MAKE_SET(hflip, 12)
+   MAKE_SET(vflip, 13)
+   MAKE_SET2(size, 14)
+};
+
+struct obj_attr2_options : detail::opt_base<0xFFFF> {
+   using self = obj_attr2_options;
+
+   MAKE_SET2(priority, 10)
+   MAKE_SET4(palette_num, 12)
+};
+
 #undef MAKE_SET
 #undef MAKE_SET2
 #undef MAKE_SET3
+#undef MAKE_SET4
 #undef MAKE_SET5
+
+#undef MAKE_SET_NAMESPACE
 
 namespace detail {
 struct preserve {};
@@ -384,15 +551,12 @@ struct dma {
 
    void set_options(detail::preserve, dma_options opt) const noexcept
    {
-      auto to_set = *control();
-      to_set &= opt.and_mask;
-      to_set |= opt.or_mask;
+      opt.apply_to(control());
       // Do some error checking
       if (num == 0) {
-         const auto start_timing = (to_set & 0b0011'0000'0000'0000) >> 12;
+         const auto start_timing = (opt.or_mask & 0b0011'0000'0000'0000) >> 12;
          GBA_ASSERT(start_timing != 3);
       }
-      *control() = to_set;
    }
 
    void set_options(dma_options opt) const noexcept
@@ -462,10 +626,7 @@ struct lcd {
    void set_options(detail::preserve, lcd_options opt) const noexcept
    {
       volatile auto* control = reinterpret_cast<std::uint16_t*>(0x400'0000);
-      auto to_set = *control;
-      to_set &= opt.and_mask;
-      to_set |= opt.or_mask;
-      *control = to_set;
+      opt.apply_to(control);
    }
 
    void set_options(lcd_options opt) const noexcept
@@ -489,13 +650,7 @@ struct bg {
 public:
    constexpr bg(int num, detail::bg_builder) noexcept : num{num} {}
 
-   void set_options(detail::preserve, bg_options opt) const noexcept
-   {
-      auto to_set = *control_addr();
-      to_set &= opt.and_mask;
-      to_set |= opt.or_mask;
-      *control_addr() = to_set;
-   }
+   void set_options(detail::preserve, bg_options opt) const noexcept { opt.apply_to(control_addr()); }
 
    void set_options(bg_options opt) const noexcept { *control_addr() = opt.or_mask; }
 
@@ -531,33 +686,97 @@ inline constexpr bg bg1{1, detail::bg_builder{}};
 inline constexpr bg bg2{2, detail::bg_builder{}};
 inline constexpr bg bg3{3, detail::bg_builder{}};
 
-inline constexpr volatile std::uint32_t* bg_char_loc(bg_opt::char_base_block opt) noexcept
+inline volatile std::uint32_t* bg_char_loc(bg_opt::char_base_block opt) noexcept
 {
-   return reinterpret_cast<volatile std::uint32_t*>(0x600'000 + 0x4000 * static_cast<int>(opt));
+   return reinterpret_cast<volatile std::uint32_t*>(0x600'0000 + 0x4000 * static_cast<int>(opt));
 }
 
-inline constexpr volatile std::uint16_t* bg_screen_loc(bg_opt::screen_base_block opt) noexcept
+inline volatile std::uint16_t* bg_screen_loc(bg_opt::screen_base_block opt) noexcept
 {
-   return reinterpret_cast<volatile std::uint16_t*>(0x600'000 + 0x800 * static_cast<int>(opt));
+   return reinterpret_cast<volatile std::uint16_t*>(0x600'0000 + 0x800 * static_cast<int>(opt));
 }
 
-inline constexpr volatile std::uint16_t* bg_palette_addr(int num) noexcept
+inline volatile std::uint16_t* bg_palette_addr(int num) noexcept
 {
    return reinterpret_cast<volatile std::uint16_t*>(0x500'0000 + 32 * num);
 }
 
-inline constexpr volatile std::uint16_t* obj_palette_addr(int num) noexcept
+inline volatile std::uint16_t* obj_palette_addr(int num) noexcept
 {
    return reinterpret_cast<volatile std::uint16_t*>(0x500'0200 + 32 * num);
 }
 
-inline constexpr volatile std::uint32_t* obj_tile_addr(int bg_mode) noexcept
+inline volatile std::uint32_t* obj_tile_addr(int bg_mode) noexcept
 {
    if (bg_mode == 0 || bg_mode == 1 || bg_mode == 2) {
       return reinterpret_cast<volatile std::uint32_t*>(0x601'0000);
    }
    return reinterpret_cast<volatile std::uint32_t*>(0x601'4000);
 }
+
+struct obj {
+public:
+   constexpr explicit obj(int num) noexcept : num{num}
+   {
+      GBA_ASSERT(num >= 0);
+      GBA_ASSERT(num < 128);
+   }
+
+   void set_y(int y) const noexcept
+   {
+      GBA_ASSERT(y >= 0 && y < 256);
+      auto val = *attr0_addr();
+      val &= 0b1111'1111'0000'0000;
+      val |= y;
+      *attr0_addr() = val;
+   }
+
+   void set_x(int x) const noexcept
+   {
+      GBA_ASSERT(x >= 0 && x < 512);
+      auto val = *attr1_addr();
+      val &= 0b1111'1110'0000'0000;
+      val |= x;
+      *attr1_addr() = val;
+   }
+
+   void set_loc(int x, int y) const noexcept
+   {
+      set_x(x);
+      set_y(y);
+   }
+
+   // TODO: Probably try and come up with better names for these
+   //       It's difficult to remember which options are where
+   //       I don't know if there's a better way to do it though
+   void set_attr0(obj_attr0_options opt) const noexcept { opt.apply_to(attr0_addr()); }
+
+   void set_attr1(obj_attr1_options opt) const noexcept { opt.apply_to(attr1_addr()); }
+
+   void set_attr2(obj_attr2_options opt) const noexcept { opt.apply_to(attr2_addr()); }
+
+   void set_tile_and_attr2(int tile, obj_attr2_options opt) const noexcept
+   {
+      GBA_ASSERT(tile >= 0 && tile < 1024);
+      *attr2_addr() = tile | opt.or_mask;
+   }
+
+private:
+   int num;
+
+   inline volatile std::uint16_t* attr0_addr() const noexcept
+   {
+      return reinterpret_cast<volatile std::uint16_t*>(0x700'0000 + 0x08 * num);
+   };
+   inline volatile std::uint16_t* attr1_addr() const noexcept
+   {
+      return reinterpret_cast<volatile std::uint16_t*>(0x700'0002 + 0x08 * num);
+   };
+   inline volatile std::uint16_t* attr2_addr() const noexcept
+   {
+      return reinterpret_cast<volatile std::uint16_t*>(0x700'0004 + 0x08 * num);
+   };
+};
 
 inline volatile std::uint32_t*
    dma3_copy(const std::uint32_t* start, const std::uint32_t* end, volatile std::uint32_t* dest) noexcept
@@ -695,6 +914,41 @@ private:
    std::uint16_t raw_val_prev{0xFFFF};
    std::uint16_t raw_val{0xFFFF};
 };
+
+inline bool in_vblank() noexcept { return *(volatile std::uint16_t*)(0x4000004) & 1; }
+
+// This is a common enough operation to have a function for it
+template<typename T, std::size_t Size>
+constexpr std::array<T, Size> adjust_tile_array(const T (&array)[Size], int tile_adj, int palette_num) noexcept
+{
+   GBA_ASSERT(palette_num >= 0 && palette_num < 16);
+   std::array<T, Size> to_ret;
+   for (std::size_t i = 0; i < Size; ++i) {
+      to_ret[i] = (array[i] + tile_adj) | (palette_num << 12);
+   }
+   return to_ret;
+}
+
+constexpr std::uint16_t make_tile(int tile_num, int palette_num) noexcept
+{
+   GBA_ASSERT(palette_num >= 0 && palette_num < 16);
+   return tile_num | (palette_num << 12);
+}
+
+// Copy a full screen tilemap to VRAM
+void copy_tilemap(const std::uint16_t (&array)[600], bg_opt::screen_base_block loc) noexcept
+{
+   const auto base_dest = bg_screen_loc(loc);
+   for (int y = 0; y != 20; ++y) {
+      dma3_copy(array + y * 30, array + y * 30 + 30, base_dest + y * 32);
+   }
+}
+
+template<std::size_t Size>
+constexpr int num_tiles(const std::uint32_t (&)[Size]) noexcept
+{
+   return Size / 8;
+}
 
 } // namespace gba
 
