@@ -7,6 +7,7 @@
 #include "generated/test_map.hpp"
 #include "generated/test_tileset.hpp"
 
+#include <algorithm>
 #include <charconv>
 
 // This only works for the specific bg size/settings we use here so it isn't in gba.hpp
@@ -35,6 +36,9 @@ int main()
 {
    using namespace gba::bg_opt;
    using namespace gba::lcd_opt;
+
+   constexpr auto screen_width = 240;
+   constexpr auto screen_height = 160;
 
    // Initital tile & palette setup (tiles and palettes are the same throughout the program)
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::bg_palette_addr(0));
@@ -140,8 +144,12 @@ int main()
    const auto map = [&]() {
       constexpr auto high_priority = gba::adjust_tile_array(test_map_high_priority_tiles, tileset_base, 1);
       constexpr auto low_priority = gba::adjust_tile_array(test_map_low_priority_tiles, tileset_base, 1);
-      int camera_x = 0;
-      int camera_y = 0;
+      int camera_target_x = -screen_width / 2;
+      int camera_target_y = -screen_height / 2 + test_map.y_offset * 8;
+      int camera_x = camera_target_x;
+      int camera_y = camera_target_y;
+      int snake_x = 0;
+      int snake_y = 0;
 
       constexpr auto blank_tile = tileset_base + 17;
 
@@ -204,39 +212,52 @@ int main()
       const auto bg3_tiles = gba::bg_screen_loc(bg3_screen_block);
 
       const auto init_screen = [&]() {
+         using namespace gba::obj_opt;
+         for (int i = 0; i < 128; ++i) {
+            gba::obj{i}.set_attr0(gba::obj_attr0_options{}.set(display::disable));
+         }
+
+         gba::obj{0}.set_attr0(gba::obj_attr0_options{}
+                                  .set(display::disable)
+                                  .set(mode::normal)
+                                  .set(gba::obj_opt::mosaic::disable)
+                                  .set(shape::vertical));
+
+         gba::obj{0}.set_attr1(gba::obj_attr1_options{}.set(size::h32x16));
+
          gba::lcd.set_options(gba::lcd_options{}.set(forced_blank::on));
 
          gba::bg0.set_options(gba::bg_options{}
-                                 .set(priority::p2)
+                                 .set(gba::bg_opt::priority::p2)
                                  .set(char_base_block::b0)
-                                 .set(mosaic::disable)
+                                 .set(gba::bg_opt::mosaic::disable)
                                  .set(colors_palettes::c16_p16)
                                  .set(bg0_screen_block)
                                  .set(display_area_overflow::transparent)
                                  .set(screen_size::text_256x256));
 
          gba::bg1.set_options(gba::bg_options{}
-                                 .set(priority::p3)
+                                 .set(gba::bg_opt::priority::p3)
                                  .set(char_base_block::b0)
-                                 .set(mosaic::disable)
+                                 .set(gba::bg_opt::mosaic::disable)
                                  .set(colors_palettes::c16_p16)
                                  .set(bg1_screen_block)
                                  .set(display_area_overflow::transparent)
                                  .set(screen_size::text_256x256));
 
          gba::bg2.set_options(gba::bg_options{}
-                                 .set(priority::p2)
+                                 .set(gba::bg_opt::priority::p2)
                                  .set(char_base_block::b0)
-                                 .set(mosaic::disable)
+                                 .set(gba::bg_opt::mosaic::disable)
                                  .set(colors_palettes::c16_p16)
                                  .set(bg2_screen_block)
                                  .set(display_area_overflow::transparent)
                                  .set(screen_size::text_256x256));
 
          gba::bg3.set_options(gba::bg_options{}
-                                 .set(priority::p3)
+                                 .set(gba::bg_opt::priority::p3)
                                  .set(char_base_block::b0)
-                                 .set(mosaic::disable)
+                                 .set(gba::bg_opt::mosaic::disable)
                                  .set(colors_palettes::c16_p16)
                                  .set(bg3_screen_block)
                                  .set(display_area_overflow::transparent)
@@ -265,7 +286,7 @@ int main()
                                  .set(display_bg1::on)
                                  .set(display_bg2::on)
                                  .set(display_bg3::on)
-                                 .set(display_obj::off)
+                                 .set(display_obj::on)
                                  .set(display_window_0::off)
                                  .set(display_window_1::off)
                                  .set(display_window_obj::off)
@@ -279,18 +300,47 @@ int main()
          while (!gba::in_vblank()) {}
 
          keypad.update();
-         const auto change_amount = keypad.r_held() ? 8 : 1;
-         if (keypad.left_held()) {
-            camera_x -= change_amount;
+         if (keypad.left_pressed()) {
+            snake_x -= 1;
          }
-         else if (keypad.right_held()) {
-            camera_x += change_amount;
+         else if (keypad.right_pressed()) {
+            snake_x += 1;
          }
-         if (keypad.up_held()) {
-            camera_y -= change_amount;
+         if (keypad.up_pressed()) {
+            snake_y -= 1;
          }
-         else if (keypad.down_held()) {
-            camera_y += change_amount;
+         else if (keypad.down_pressed()) {
+            snake_y += 1;
+         }
+
+         snake_x = std::clamp(snake_x, 0, test_map.width - 1);
+         snake_y = std::clamp(snake_y, 0, test_map.height - 1);
+         camera_target_x = -screen_width / 2 + snake_x * 16 + snake_y * 16;
+         camera_target_y = -screen_height / 2 + snake_y * 8 - snake_x * 8 - test_map.height_at(snake_x, snake_y) * 8
+                         + test_map.y_offset * 8;
+         camera_x += std::clamp(camera_target_x - camera_x, -8, 8);
+         camera_y += std::clamp(camera_target_y - camera_y, -8, 8);
+
+         const auto snake_display_x = 8 - camera_x + snake_x * 16 + snake_y * 16;
+         const auto snake_display_y = -24 - camera_y + snake_y * 8 - snake_x * 8
+                                    - test_map.height_at(snake_x, snake_y) * 8 + test_map.y_offset * 8;
+
+         if (
+            snake_display_x < -16 || snake_display_x >= screen_width || snake_display_y < -32
+            || snake_display_y >= screen_height) {
+            gba::obj{0}.set_attr0(gba::obj_attr0_options{}.set(gba::obj_opt::display::disable));
+         }
+         else {
+            using namespace gba::obj_opt;
+            gba::obj{0}.set_attr0(gba::obj_attr0_options{}
+                                     .set(display::enable)
+                                     .set(mode::normal)
+                                     .set(gba::obj_opt::mosaic::disable)
+                                     .set(shape::vertical));
+            gba::obj{0}.set_loc(snake_display_x, snake_display_y);
+            gba::obj{0}.set_attr2(gba::obj_attr2_options{}.set(
+               test_map.sprite_is_high_priority_at(snake_x, snake_y) ? gba::obj_opt::priority{2}
+                                                                     : gba::obj_opt::priority{3}));
          }
 
          if (keypad.a_pressed()) {
