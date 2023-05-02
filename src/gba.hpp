@@ -378,7 +378,7 @@ struct opt_base {
    constexpr void set_field(int shift_amount, int value) noexcept
    {
       const std::uint16_t base_value = value << shift_amount;
-      and_mask &= base_value;
+      and_mask &= ~(1 << shift_amount);
       or_mask |= base_value;
    }
 
@@ -724,19 +724,17 @@ public:
 
    void set_y(int y) const noexcept
    {
-      GBA_ASSERT(y >= 0 && y < 256);
       auto val = *attr0_addr();
       val &= 0b1111'1111'0000'0000;
-      val |= y;
+      val |= 0b0000'0000'1111'1111 & y;
       *attr0_addr() = val;
    }
 
    void set_x(int x) const noexcept
    {
-      GBA_ASSERT(x >= 0 && x < 512);
       auto val = *attr1_addr();
       val &= 0b1111'1110'0000'0000;
-      val |= x;
+      val |= 0b0000'0001'1111'1111 & x;
       *attr1_addr() = val;
    }
 

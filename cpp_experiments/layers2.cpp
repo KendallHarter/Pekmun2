@@ -217,13 +217,15 @@ int main()
             gba::obj{i}.set_attr0(gba::obj_attr0_options{}.set(display::disable));
          }
 
-         gba::obj{0}.set_attr0(gba::obj_attr0_options{}
-                                  .set(display::disable)
-                                  .set(mode::normal)
-                                  .set(gba::obj_opt::mosaic::disable)
-                                  .set(shape::vertical));
+         for (int i = 0; i < 2; ++i) {
+            gba::obj{i}.set_attr0(gba::obj_attr0_options{}
+                                     .set(display::disable)
+                                     .set(mode::normal)
+                                     .set(gba::obj_opt::mosaic::disable)
+                                     .set(shape::vertical));
 
-         gba::obj{0}.set_attr1(gba::obj_attr1_options{}.set(size::h32x16));
+            gba::obj{i}.set_attr1(gba::obj_attr1_options{}.set(size::h32x16));
+         }
 
          gba::lcd.set_options(gba::lcd_options{}.set(forced_blank::on));
 
@@ -321,27 +323,28 @@ int main()
          camera_x += std::clamp(camera_target_x - camera_x, -8, 8);
          camera_y += std::clamp(camera_target_y - camera_y, -8, 8);
 
-         const auto snake_display_x = 8 - camera_x + snake_x * 16 + snake_y * 16;
-         const auto snake_display_y = -24 - camera_y + snake_y * 8 - snake_x * 8
-                                    - test_map.height_at(snake_x, snake_y) * 8 + test_map.y_offset * 8;
+         constexpr auto snake2_x = 5;
+         constexpr auto snake2_y = 5;
 
-         if (
-            snake_display_x < -16 || snake_display_x >= screen_width || snake_display_y < -32
-            || snake_display_y >= screen_height) {
-            gba::obj{0}.set_attr0(gba::obj_attr0_options{}.set(gba::obj_opt::display::disable));
-         }
-         else {
-            using namespace gba::obj_opt;
-            gba::obj{0}.set_attr0(gba::obj_attr0_options{}
-                                     .set(display::enable)
-                                     .set(mode::normal)
-                                     .set(gba::obj_opt::mosaic::disable)
-                                     .set(shape::vertical));
-            gba::obj{0}.set_loc(snake_display_x, snake_display_y);
-            gba::obj{0}.set_attr2(gba::obj_attr2_options{}.set(
-               test_map.sprite_is_high_priority_at(snake_x, snake_y) ? gba::obj_opt::priority{2}
-                                                                     : gba::obj_opt::priority{3}));
-         }
+         const auto display_sprite = [&](int x, int y, int obj_num) {
+            const auto disp_x = 8 - camera_x + x * 16 + y * 16;
+            const auto disp_y = -24 - camera_y + y * 8 - x * 8 - test_map.height_at(x, y) * 8 + test_map.y_offset * 8;
+            if (disp_x < -16 || disp_x >= screen_width || disp_y < -32 || disp_y >= screen_height) {
+               gba::obj{obj_num}.set_attr0(gba::obj_attr0_options{}.set(gba::obj_opt::display::disable));
+            }
+            else {
+               using namespace gba::obj_opt;
+               gba::obj{obj_num}.set_attr0(gba::obj_attr0_options{}.set(display::enable));
+               gba::obj{obj_num}.set_loc(disp_x, disp_y);
+               gba::obj{obj_num}.set_attr2(gba::obj_attr2_options{}.set(
+                  test_map.sprite_is_high_priority_at(x, y) ? gba::obj_opt::priority{2} : gba::obj_opt::priority{3}));
+            }
+         };
+
+         // "Sort" by the y value
+         const auto first_snake_obj = snake_y > snake2_y ? 0 : 1;
+         display_sprite(snake_x, snake_y, first_snake_obj);
+         display_sprite(snake2_x, snake2_y, 1 - first_snake_obj);
 
          if (keypad.a_pressed()) {
             if (move_showing) {
