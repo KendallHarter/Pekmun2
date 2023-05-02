@@ -185,14 +185,14 @@ int main()
       const auto scroll_layer = [&](const std::uint16_t* layer_data, screen_base_block loc) {
          const auto offset_x = camera_x < 0 ? (camera_x - 7) / 8 : camera_x / 8;
          const auto offset_y = camera_y < 0 ? (camera_y - 7) / 8 : camera_y / 8;
-         for (auto y : {0, 20}) {
+         for (auto y : {0, 1, 19, 20}) {
             const unsigned tile_y = y + offset_y;
             for (auto x = 0; x != 31; ++x) {
                const unsigned tile_x = x + offset_x;
                *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
             }
          }
-         for (auto x : {0, 30}) {
+         for (auto x : {0, 1, 29, 30}) {
             const unsigned tile_x = x + offset_x;
             for (auto y = 0; y != 21; ++y) {
                const unsigned tile_y = y + offset_y;
@@ -320,8 +320,8 @@ int main()
          camera_target_x = -screen_width / 2 + snake_x * 16 + snake_y * 16;
          camera_target_y = -screen_height / 2 + snake_y * 8 - snake_x * 8 - test_map.height_at(snake_x, snake_y) * 8
                          + test_map.y_offset * 8;
-         camera_x += std::clamp(camera_target_x - camera_x, -8, 8);
-         camera_y += std::clamp(camera_target_y - camera_y, -8, 8);
+         camera_x += std::clamp(camera_target_x - camera_x, -16, 16);
+         camera_y += std::clamp(camera_target_y - camera_y, -16, 16);
 
          constexpr auto snake2_x = 5;
          constexpr auto snake2_y = 5;
