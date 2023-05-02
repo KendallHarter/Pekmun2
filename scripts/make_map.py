@@ -47,7 +47,8 @@ class Map:
    #     A tile to the upper-left is tile high priority [y - 1]
    #     A tile to the upper-right is tile high priority [x + 1]
    #     A tile above one is tile high priority [x + 1, y - 1]
-   #     A tile one to the upper-left and two to the upper-right is tile high priority [y - 1, x + 2]
+   #     A tile one to the upper-left and two to the upper-right is tile high priority [x + 2, y - 1]
+   #     A tile two to the upper-left and one to the upper-right is tile high priority [x + 1, y - 2]
    def tile_is_sprite_priority(self, x, y):
       if self.tile_is_high_priority(x, y):
          return True
@@ -58,6 +59,8 @@ class Map:
       elif self.tile_is_high_priority(x + 2, y - 1):
          return True
       elif self.tile_is_high_priority(x + 1, y - 1):
+         return True
+      elif self.tile_is_high_priority(x + 1, y - 2):
          return True
       return False
 

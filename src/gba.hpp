@@ -950,4 +950,23 @@ constexpr int num_tiles(const std::uint32_t (&)[Size]) noexcept
 
 } // namespace gba
 
+constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept
+{
+   const auto conv = [](std::uint8_t val) {
+      // std::round isn't constexpr until C++23 so have to manually round
+      // lowest value to use for a color component
+      constexpr auto low_val = 0;
+      const auto temp_val = (31 - low_val) * val / 255.0;
+      const auto frac_part = temp_val - static_cast<int>(temp_val);
+      if (frac_part > 0.5) {
+         return low_val + static_cast<int>(temp_val) + 1;
+      }
+      else {
+         return low_val + static_cast<int>(temp_val);
+      }
+   };
+
+   return (conv(b) << 10) | (conv(g) << 5) | conv(r);
+}
+
 #endif
