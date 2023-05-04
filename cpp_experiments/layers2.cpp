@@ -47,7 +47,7 @@ int main()
    const auto tileset_begin = gba::dma3_copy(std::begin(font), std::end(font), gba::bg_char_loc(char_base_block::b0));
    const auto move_indic_begin = gba::dma3_copy(std::begin(test_tileset), std::end(test_tileset), tileset_begin);
    gba::dma3_copy(std::begin(move_indicator), std::end(move_indicator), move_indic_begin);
-   gba::dma3_copy(std::begin(snake), std::end(snake), gba::obj_tile_addr(0));
+   gba::dma3_copy(std::begin(snake), std::end(snake), gba::base_obj_tile_addr(0));
    gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), gba::obj_palette_addr(0));
 
    // Set background to light blue

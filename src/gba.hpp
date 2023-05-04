@@ -275,7 +275,7 @@ enum struct colors_pal {
 
 enum struct shape {
    square,
-   horiztonal,
+   horizontal,
    vertical
 };
 
@@ -706,7 +706,7 @@ inline volatile std::uint16_t* obj_palette_addr(int num) noexcept
    return reinterpret_cast<volatile std::uint16_t*>(0x500'0200 + 32 * num);
 }
 
-inline volatile std::uint32_t* obj_tile_addr(int bg_mode) noexcept
+inline volatile std::uint32_t* base_obj_tile_addr(int bg_mode) noexcept
 {
    if (bg_mode == 0 || bg_mode == 1 || bg_mode == 2) {
       return reinterpret_cast<volatile std::uint32_t*>(0x601'0000);
@@ -738,6 +738,15 @@ public:
       *attr1_addr() = val;
    }
 
+   void set_tile(int tile) const noexcept
+   {
+      GBA_ASSERT(tile >= 0 && tile < 1024);
+      auto val = *attr2_addr();
+      val &= 0b1111'1100'0000'0000;
+      val |= tile;
+      *attr2_addr() = val;
+   }
+
    void set_loc(int x, int y) const noexcept
    {
       set_x(x);
@@ -752,6 +761,16 @@ public:
    void set_attr1(obj_attr1_options opt) const noexcept { opt.apply_to(attr1_addr()); }
 
    void set_attr2(obj_attr2_options opt) const noexcept { opt.apply_to(attr2_addr()); }
+
+   void set_y_and_attr0(int y, obj_attr0_options opt) const noexcept
+   {
+      *attr0_addr() = (y & 0b0000'0000'1111'1111) | opt.or_mask;
+   }
+
+   void set_x_and_attr1(int x, obj_attr1_options opt) const noexcept
+   {
+      *attr0_addr() = (x & 0b0000'0001'1111'1111) | opt.or_mask;
+   }
 
    void set_tile_and_attr2(int tile, obj_attr2_options opt) const noexcept
    {

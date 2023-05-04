@@ -124,6 +124,9 @@ fix_gba_target(layers)
 add_executable(layers2 cpp_experiments/layers2.cpp)
 fix_gba_target(layers2)
 
+add_executable(health_bar_test cpp_experiments/health_bar_test.cpp)
+fix_gba_target(health_bar_test)
+
 # For experiments use this target
 add_library(standard_includes INTERFACE)
 target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -132,12 +135,14 @@ target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_D
 target_link_libraries(pekmun2 PUBLIC standard_includes)
 target_link_libraries(scrolling PUBLIC standard_includes)
 target_link_libraries(layers PUBLIC standard_includes)
-target_link_libraries(layers2 PUBLIC standard_includes fmt::fmt)
+target_link_libraries(layers2 PUBLIC standard_includes)
+target_link_libraries(health_bar_test PUBLIC standard_includes fmt::fmt)
 
 process_image(font.png font)
 process_image(test_tileset.png test_tileset)
 process_image(snake.png snake)
 process_image(move_indicator.png move_indicator)
+process_image(health_bar.png health_bar)
 
 process_fullscreen_tilemap(stats.json stats_screen)
 
@@ -147,3 +152,4 @@ add_dependencies(pekmun2 font)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)
+add_dependencies(health_bar_test health_bar font)
