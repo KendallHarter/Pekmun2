@@ -54,6 +54,9 @@ def process_image(image) -> (list[int], list[int]):
    for a, b, c, d in zip(*([iter(image_vals)] * 4)):
       bit32_vals.append(int(d << 24 | c << 16 | b << 8 | a))
 
+   if len(image_pal) > 16:
+      sys.exit(f'Image {sys.argv[1]} has too many colors ({len(image_pal)}/16)')
+
    return bit32_vals, image_pal
 
 

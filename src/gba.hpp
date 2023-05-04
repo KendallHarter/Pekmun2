@@ -243,8 +243,8 @@ enum class screen_size {
 namespace obj_opt {
 
 enum struct rot_scale {
-   enable,
-   disable
+   disable,
+   enable
 };
 
 enum struct double_size {
@@ -769,7 +769,7 @@ public:
 
    void set_x_and_attr1(int x, obj_attr1_options opt) const noexcept
    {
-      *attr0_addr() = (x & 0b0000'0001'1111'1111) | opt.or_mask;
+      *attr1_addr() = (x & 0b0000'0001'1111'1111) | opt.or_mask;
    }
 
    void set_tile_and_attr2(int tile, obj_attr2_options opt) const noexcept
@@ -967,13 +967,10 @@ constexpr int num_tiles(const std::uint32_t (&)[Size]) noexcept
    return Size / 8;
 }
 
-} // namespace gba
-
 constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept
 {
    const auto conv = [](std::uint8_t val) {
       // std::round isn't constexpr until C++23 so have to manually round
-      // lowest value to use for a color component
       constexpr auto low_val = 0;
       const auto temp_val = (31 - low_val) * val / 255.0;
       const auto frac_part = temp_val - static_cast<int>(temp_val);
@@ -987,5 +984,17 @@ constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint
 
    return (conv(b) << 10) | (conv(g) << 5) | conv(r);
 }
+
+// This reduces the wait cycles to a minimum and enables prefetch
+void set_fast_mode()
+{
+   const auto ptr = reinterpret_cast<volatile std::uint16_t*>(0x400'0204);
+   *ptr = 0b0100'0110'1101'1010;
+}
+
+// Soft resets
+void soft_reset() { asm(".thumb_func\nswi 0"); }
+
+} // namespace gba
 
 #endif

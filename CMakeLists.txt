@@ -64,35 +64,26 @@ execute_process(
    COMMAND "${CMAKE_COMMAND}" -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-function(process_image input_file output_name)
-   add_custom_command(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
-      COMMAND Python3::Interpreter
-         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/process_image.py"
-         "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
-         "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
-         "${output_name}"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
-      VERBATIM
-   )
+macro(create_image_func func_name script_name)
+   function(${func_name} input_file output_name)
+      add_custom_command(
+         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
+         COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/${script_name}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
+            "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
+            "${output_name}"
+         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
+         VERBATIM
+      )
 
-   add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
-endfunction()
+      add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
+   endfunction()
+endmacro()
 
-function(process_fullscreen_tilemap input_file output_name)
-   add_custom_command(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
-      COMMAND Python3::Interpreter
-         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/process_fullscreen_tilemap.py"
-         "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
-         "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
-         "${output_name}"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_file}"
-      VERBATIM
-   )
-
-   add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
-endfunction()
+create_image_func(process_image process_image.py)
+create_image_func(process_fullscreen_tilemap process_fullscreen_tilemap.py)
+create_image_func(process_bitmap_image process_bitmap_image.py)
 
 function(process_map input_map output_name)
    add_custom_command(
@@ -146,9 +137,11 @@ process_image(health_bar.png health_bar)
 
 process_fullscreen_tilemap(stats.json stats_screen)
 
+process_bitmap_image(title.png title)
+
 process_map(test_map test_map)
 
-add_dependencies(pekmun2 font)
+add_dependencies(pekmun2 font title)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)

@@ -1,66 +1,124 @@
 #include "gba.hpp"
 
 #include "generated/font.hpp"
+#include "generated/title.hpp"
 
+#include <algorithm>
 #include <array>
 #include <utility>
 
+namespace font_chars {
+inline constexpr char arrow = 0x05;
+}
+
+enum struct title_selection {
+   new_game,
+   continue_
+};
+
+gba::keypad_status keypad;
+
+title_selection title_screen()
+{
+   gba::lcd.set_options(gba::lcd_options{}.set(gba::lcd_opt::forced_blank::on));
+
+   gba::dma3_copy(std::begin(font), std::end(font), gba::base_obj_tile_addr(3));
+   gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::obj_palette_addr(0));
+   gba::dma3_copy(std::begin(title), std::end(title), gba::bg_screen_loc(gba::bg_opt::screen_base_block::b0));
+   gba::bg3.set_options(gba::bg_options{}.set(gba::bg_opt::priority::p3));
+
+   // Disable all sprites to be safe
+   for (int i = 0; i < 128; ++i) {
+      using namespace gba::obj_opt;
+      gba::obj{i}.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
+   }
+
+   // Show New Game/Continue options
+   const auto disp_sprite_text = [](const char* text, const int x, const int y, const int base_obj_no) {
+      int i = 0;
+      for (; text[i] != '\0'; ++i) {
+         using namespace gba::obj_opt;
+         const auto cur_obj = gba::obj{base_obj_no + i};
+         cur_obj.set_y_and_attr0(
+            y,
+            gba::obj_attr0_options{}
+               .set(display::enable)
+               .set(shape::square)
+               .set(colors_pal::c16_p16)
+               .set(mosaic::disable)
+               .set(mode::normal)
+               .set(rot_scale::disable));
+         cur_obj.set_x_and_attr1(
+            x + i * 8, gba::obj_attr1_options{}.set(size::s8x8).set(vflip::disable).set(hflip::disable));
+         // BG3 tiles start at 512
+         cur_obj.set_tile(512 + text[i]);
+         // cur_obj.set_tile_and_attr2(512 + text[i], gba::obj_attr2_options{}.set(priority::p0).set(palette_num::p0));
+      }
+      return i + base_obj_no;
+   };
+   const auto continue_obj = disp_sprite_text("New Game", 160, 16, 0);
+   const auto arrow_obj = disp_sprite_text("Continue", 160, 24, continue_obj);
+
+   // Arrow
+   {
+      using namespace gba::obj_opt;
+      gba::obj{arrow_obj}.set_y_and_attr0(
+         16,
+         gba::obj_attr0_options{}
+            .set(display::enable)
+            .set(shape::square)
+            .set(colors_pal::c16_p16)
+            .set(mosaic::disable)
+            .set(mode::normal)
+            .set(rot_scale::disable));
+      gba::obj{arrow_obj}.set_x_and_attr1(
+         152, gba::obj_attr1_options{}.set(size::s8x8).set(vflip::disable).set(hflip::disable));
+      gba::obj{arrow_obj}.set_tile(512 + font_chars::arrow);
+   }
+   {
+      using namespace gba::lcd_opt;
+      gba::lcd.set_options(gba::lcd_options{}
+                              .set(bg_mode::mode_3)
+                              .set(forced_blank::off)
+                              .set(display_bg0::off)
+                              .set(display_bg1::off)
+                              .set(display_bg2::on)
+                              .set(display_bg3::off)
+                              .set(display_obj::on)
+                              .set(display_window_0::off)
+                              .set(display_window_1::off)
+                              .set(display_window_obj::off)
+                              .set(obj_char_mapping::one_dimensional));
+   }
+
+   int arrow_loc = 0;
+   while (true) {
+      while (gba::in_vblank()) {}
+      while (!gba::in_vblank()) {}
+
+      keypad.update();
+
+      if (keypad.up_pressed()) {
+         arrow_loc -= 1;
+      }
+      else if (keypad.down_pressed()) {
+         arrow_loc += 1;
+      }
+
+      if (keypad.a_pressed()) {
+         break;
+      }
+
+      arrow_loc = std::clamp(arrow_loc, 0, 1);
+
+      gba::obj{arrow_obj}.set_y(16 + arrow_loc * 8);
+   }
+
+   return arrow_loc == 0 ? title_selection::new_game : title_selection::continue_;
+}
+
 int main()
 {
-   using namespace gba::dma_opt;
-   using namespace gba::lcd_opt;
-   volatile std::uint16_t* bg_palettes = (std::uint16_t*)0x5000000;
-   volatile std::uint32_t* tiles_data = (std::uint32_t*)0x6000000;
-   gba::dma3_copy(std::begin(font), std::end(font), tiles_data);
-   gba::dma3_copy(std::begin(font_pal), std::end(font_pal), bg_palettes);
-   // copy the font tiles and palette
-   gba::lcd.set_options(gba::lcd_options{}
-                           .set(bg_mode{0})
-                           .set(forced_blank::off)
-                           .set(display_bg1::on)
-                           .set(display_obj::off)
-                           .set(display_window_0::off)
-                           .set(display_window_1::off)
-                           .set(display_window_obj::off)
-                           .set(obj_char_mapping::one_dimensional));
-
-   const auto bg1_loc = [&](int x, int y) {
-      return ((volatile std::uint16_t*)((std::uint8_t*)tiles_data + 0x800 * 31 + x * 2 + y * 0x40));
-   };
-
-   // TODO: Document these & make them options in gba.hpp
-   //       This is setting video mode options
-   *(volatile std::uint16_t*)(0x4000008) = 0b0001'1110'0000'0011;
-   *(volatile std::uint16_t*)(0x400000A) = 0b0001'1111'0000'0010;
-
-   gba::dma3_fill(bg1_loc(0, 0), bg1_loc(30, 20), ' ');
-
-   const auto write_it = [&](const char* c, int x, int y) {
-      for (int i = 0; c[i] != '\0'; ++i) {
-         *bg1_loc(x + i, y) = c[i];
-      }
-   };
-
-   write_it("The quick brown fox jumped", 0, 0);
-   write_it("over the lazy brown dog.", 0, 1);
-   write_it("!@#$%^&*()_+", 0, 2);
-   write_it("0123456789`'\"~", 0, 3);
-   write_it("012345678901234567890123456789", 0, 4);
-   int scroll = 0;
-   volatile std::uint16_t* bg1_x_scroll_loc = (std::uint16_t*)0x4000014;
-   gba::keypad_status keypad;
-   while (true) {
-      // wait for vblank to end
-      while ((*(volatile std::uint16_t*)(0x4000004) & 1)) {}
-      // wait for vblank to start
-      while (!(*(volatile std::uint16_t*)(0x4000004) & 1)) {}
-      keypad.update();
-      if (keypad.left_held()) {
-         scroll -= 1;
-      }
-      else if (keypad.right_held()) {
-         scroll += 1;
-      }
-      *bg1_x_scroll_loc = scroll;
-   }
+   gba::set_fast_mode();
+   title_screen();
 }

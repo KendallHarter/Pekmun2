@@ -39,9 +39,6 @@ int main()
    const auto start_bg0 = gba::bg_screen_loc(gba::bg_opt::screen_base_block::b62);
    gba::dma3_fill(start_bg0, start_bg0 + 256 / 8 * 256 / 8, ' ');
 
-   // Set background to light blue
-   *gba::bg_palette_addr(0) = make_gba_color(0, 0xBA, 0xFF);
-
    for (int i = 0; i < 128; ++i) {
       gba::obj{i}.set_attr0(gba::obj_attr0_options{}.set(gba::obj_opt::display::disable));
    }

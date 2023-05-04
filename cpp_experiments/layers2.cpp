@@ -51,7 +51,7 @@ int main()
    gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), gba::obj_palette_addr(0));
 
    // Set background to light blue
-   *gba::bg_palette_addr(0) = make_gba_color(0, 0xBA, 0xFF);
+   *gba::bg_palette_addr(0) = gba::make_gba_color(0, 0xBA, 0xFF);
 
    constexpr auto tileset_base = gba::num_tiles(font);
    constexpr auto move_indic_base = tileset_base + gba::num_tiles(test_tileset);
