@@ -914,6 +914,8 @@ struct keypad_status {
    bool r_held() const { return held_impl(8); }
    bool l_held() const { return held_impl(9); }
 
+   bool soft_reset_buttons_held() const { return a_held() && b_held() && start_held() && select_held(); }
+
 private:
    bool pressed_impl(int bit_no) const
    {
@@ -925,7 +927,7 @@ private:
    bool held_impl(int bit_no) const
    {
       const std::uint16_t mask = 1 << bit_no;
-      return (raw_val_prev & mask) == 0;
+      return (raw_val & mask) == 0;
    }
 
    std::uint16_t raw_val_prev{0xFFFF};
@@ -986,14 +988,20 @@ constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint
 }
 
 // This reduces the wait cycles to a minimum and enables prefetch
-void set_fast_mode()
+inline void set_fast_mode() noexcept
 {
    const auto ptr = reinterpret_cast<volatile std::uint16_t*>(0x400'0204);
    *ptr = 0b0100'0110'1101'1010;
 }
 
 // Soft resets
-void soft_reset() { asm(".thumb_func\nswi 0"); }
+[[noreturn]] inline void soft_reset() noexcept
+{
+   asm(".thumb_func\nswi 0");
+   __builtin_unreachable();
+}
+
+inline volatile std::uint8_t* sram_addr() noexcept { return reinterpret_cast<volatile std::uint8_t*>(0xE00'0000); }
 
 } // namespace gba
 
