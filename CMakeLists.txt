@@ -123,7 +123,7 @@ add_library(standard_includes INTERFACE)
 target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Include the build directory so generated files can be accessed
-target_link_libraries(pekmun2 PUBLIC standard_includes)
+target_link_libraries(pekmun2 PUBLIC standard_includes fmt::fmt)
 target_link_libraries(scrolling PUBLIC standard_includes)
 target_link_libraries(layers PUBLIC standard_includes)
 target_link_libraries(layers2 PUBLIC standard_includes)
@@ -137,12 +137,13 @@ process_image(health_bar.png health_bar)
 
 process_fullscreen_tilemap(stats.json stats_screen)
 process_fullscreen_tilemap(file_select.json file_select)
+process_fullscreen_tilemap(naming_screen.json naming_screen)
 
 process_bitmap_image(title.png title)
 
 process_map(test_map test_map)
 
-add_dependencies(pekmun2 font title test_tileset file_select stats_screen)
+add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)

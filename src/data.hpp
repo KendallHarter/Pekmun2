@@ -18,6 +18,7 @@ struct item {
 
 struct character {
    std::array<char, 16> name;
+   const char* class_name;
    std::int32_t level;
    std::int64_t hp;
    std::int64_t max_hp;

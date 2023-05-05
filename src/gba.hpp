@@ -888,43 +888,73 @@ struct keypad_status {
    {
       raw_val_prev = raw_val;
       raw_val = *(volatile std::uint16_t*)(0x4000130);
+      const std::array<std::pair<int&, decltype(&keypad_status::prev_up_held)>, 4> repeat_info{
+         {{up_counter, &keypad_status::prev_up_held},
+          {down_counter, &keypad_status::prev_down_held},
+          {left_counter, &keypad_status::prev_left_held},
+          {right_counter, &keypad_status::prev_right_held}}};
+      for (auto&& [counter, func] : repeat_info) {
+         if ((this->*func)()) {
+            counter += 1;
+            counter %= 6;
+         }
+         else {
+            counter = 0;
+         }
+      }
    }
 
    // TODO: Better name?
    // Pressed series only returns true if the key is newly pressed
-   bool a_pressed() const { return pressed_impl(0); }
-   bool b_pressed() const { return pressed_impl(1); }
-   bool select_pressed() const { return pressed_impl(2); }
-   bool start_pressed() const { return pressed_impl(3); }
-   bool right_pressed() const { return pressed_impl(4); }
-   bool left_pressed() const { return pressed_impl(5); }
-   bool up_pressed() const { return pressed_impl(6); }
-   bool down_pressed() const { return pressed_impl(7); }
-   bool r_pressed() const { return pressed_impl(8); }
-   bool l_pressed() const { return pressed_impl(9); }
+   bool a_pressed() const noexcept { return pressed_impl(0); }
+   bool b_pressed() const noexcept { return pressed_impl(1); }
+   bool select_pressed() const noexcept { return pressed_impl(2); }
+   bool start_pressed() const noexcept { return pressed_impl(3); }
+   bool right_pressed() const noexcept { return pressed_impl(4); }
+   bool left_pressed() const noexcept { return pressed_impl(5); }
+   bool up_pressed() const noexcept { return pressed_impl(6); }
+   bool down_pressed() const noexcept { return pressed_impl(7); }
+   bool r_pressed() const noexcept { return pressed_impl(8); }
+   bool l_pressed() const noexcept { return pressed_impl(9); }
 
-   bool a_held() const { return held_impl(0); }
-   bool b_held() const { return held_impl(1); }
-   bool select_held() const { return held_impl(2); }
-   bool start_held() const { return held_impl(3); }
-   bool right_held() const { return held_impl(4); }
-   bool left_held() const { return held_impl(5); }
-   bool up_held() const { return held_impl(6); }
-   bool down_held() const { return held_impl(7); }
-   bool r_held() const { return held_impl(8); }
-   bool l_held() const { return held_impl(9); }
+   bool a_held() const noexcept { return held_impl(0); }
+   bool b_held() const noexcept { return held_impl(1); }
+   bool select_held() const noexcept { return held_impl(2); }
+   bool start_held() const noexcept { return held_impl(3); }
+   bool right_held() const noexcept { return held_impl(4); }
+   bool left_held() const noexcept { return held_impl(5); }
+   bool up_held() const noexcept { return held_impl(6); }
+   bool down_held() const noexcept { return held_impl(7); }
+   bool r_held() const noexcept { return held_impl(8); }
+   bool l_held() const noexcept { return held_impl(9); }
 
-   bool soft_reset_buttons_held() const { return a_held() && b_held() && start_held() && select_held(); }
+   bool up_repeat() const noexcept { return up_held() && up_counter == 0; }
+   bool down_repeat() const noexcept { return down_held() && down_counter == 0; }
+   bool left_repeat() const noexcept { return left_held() && left_counter == 0; }
+   bool right_repeat() const noexcept { return right_held() && right_counter == 0; }
+
+   bool soft_reset_buttons_held() const noexcept { return a_held() && b_held() && start_held() && select_held(); }
 
 private:
-   bool pressed_impl(int bit_no) const
+   bool prev_right_held() const noexcept { return prev_held(4); }
+   bool prev_left_held() const noexcept { return prev_held(5); }
+   bool prev_up_held() const noexcept { return prev_held(6); }
+   bool prev_down_held() const noexcept { return prev_held(7); }
+
+   bool pressed_impl(int bit_no) const noexcept
    {
       const std::uint16_t mask = 1 << bit_no;
       // if previously not pressed but now pressed
       return (((raw_val_prev & mask) != 0)) && ((raw_val & mask) == 0);
    }
 
-   bool held_impl(int bit_no) const
+   bool prev_held(int bit_no) const noexcept
+   {
+      const std::uint16_t mask = 1 << bit_no;
+      return (raw_val_prev & mask) == 0;
+   }
+
+   bool held_impl(int bit_no) const noexcept
    {
       const std::uint16_t mask = 1 << bit_no;
       return (raw_val & mask) == 0;
@@ -932,6 +962,10 @@ private:
 
    std::uint16_t raw_val_prev{0xFFFF};
    std::uint16_t raw_val{0xFFFF};
+   int up_counter;
+   int down_counter;
+   int right_counter;
+   int left_counter;
 };
 
 inline bool in_vblank() noexcept { return *(volatile std::uint16_t*)(0x4000004) & 1; }
@@ -988,10 +1022,11 @@ constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint
 }
 
 // This reduces the wait cycles to a minimum and enables prefetch
+// It sets SRAM wait cycles to the max because that's what's recommended in GBATEK
 inline void set_fast_mode() noexcept
 {
    const auto ptr = reinterpret_cast<volatile std::uint16_t*>(0x400'0204);
-   *ptr = 0b0100'0110'1101'1010;
+   *ptr = 0b0100'0110'1101'1011;
 }
 
 // Soft resets
