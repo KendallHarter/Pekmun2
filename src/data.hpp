@@ -32,9 +32,9 @@ struct base_stats {
 struct character {
    bool exists = false;
    bool is_enemy = false;
+   std::uint8_t class_;
    base_stats bases;
    std::array<char, 16> name;
-   const char* class_name;
    std::int32_t level;
    std::int64_t hp;
    std::int64_t max_hp;
@@ -80,5 +80,8 @@ struct character {
 
 inline constexpr base_stats default_snake_base_stats{
    .hp = 10, .mp = 5, .attack = 10, .defense = 5, .m_attack = 10, .m_defense = 5, .speed = 5, .hit = 10};
+
+inline constexpr base_stats default_snake_minion_stats{
+   .hp = 7, .mp = 3, .attack = 7, .defense = 4, .m_attack = 7, .m_defense = 4, .speed = 4, .hit = 7};
 
 #endif // DATA_HPP

@@ -6,6 +6,7 @@
 
 #include <fmt/core.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -16,10 +17,13 @@ struct global_save_data {
 
 constexpr std::array<char, 4> file_exists_text{{'P', 'e', 'k', '2'}};
 
+inline constexpr int max_characters = 16;
+inline constexpr int max_items = 48;
+
 struct file_save_data {
    std::array<char, 4> exists_text = file_exists_text;
-   std::array<character, 16> characters;
-   std::array<item, 48> items;
+   std::array<character, max_characters> characters;
+   std::array<item, max_items> items;
    std::uint32_t progress;
    std::array<char, 16> file_name;
    std::int32_t file_level;
@@ -86,6 +90,7 @@ inline file_load_data get_file_load_data(int file_no) noexcept
 inline std::array<char, 14> frames_to_time(std::uint64_t frame_count) noexcept
 {
    std::array<char, 14> to_ret;
+   std::fill(to_ret.begin(), to_ret.end(), '\0');
    // GBA runs at 59.7275Hz; this is equivalent to dividing by that value
    const auto seconds = frame_count * 10000 / 597275;
    const auto minutes = seconds / 60;

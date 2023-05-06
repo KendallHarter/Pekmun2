@@ -6,6 +6,7 @@
 #include "generated/test_tileset.hpp"
 #include "generated/title.hpp"
 
+#include "classes.hpp"
 #include "data.hpp"
 #include "save_data.hpp"
 
@@ -26,6 +27,8 @@ inline constexpr char box_ur = 0x03;
 inline constexpr char box_left_vertical = 0x04;
 inline constexpr char arrow = 0x05;
 inline constexpr char hollow_arrow = 0x06;
+inline constexpr char down_arrow = 0x07;
+inline constexpr char up_arrow = 0x08;
 inline constexpr char box_bl = 0x11;
 inline constexpr char box_bottom = 0x12;
 inline constexpr char box_br = 0x13;
@@ -473,6 +476,12 @@ void draw_box(gba::bg_opt::screen_base_block loc, int x, int y, int width, int h
       draw_at(font_chars::box_left_vertical, x, y + 1 + i);
       draw_at(font_chars::box_right_vertical, x + width - 1, y + 1 + i);
    }
+   // fill in the middle
+   for (int y2 = 1; y2 < height - 1; ++y2) {
+      for (int x2 = 1; x2 < width - 1; ++x2) {
+         draw_at(' ', x + x2, y + y2);
+      }
+   }
 }
 
 void draw_menu(std::span<const char* const> options, int x, int y, int blank_arrow_loc = -1) noexcept
@@ -522,9 +531,18 @@ void draw_menu(std::span<const char* const> options, int x, int y, int blank_arr
    }
 }
 
-int menu(std::span<const char* const> options, int x, int y, int default_choice, bool allow_cancel) noexcept
+int menu(
+   std::span<const char* const> options,
+   int x,
+   int y,
+   int default_choice,
+   bool allow_cancel,
+   bool draw_the_menu = true) noexcept
 {
-   draw_menu(options, x, y);
+   if (draw_the_menu) {
+      draw_menu(options, x, y);
+   }
+
    const auto draw_at
       = [](char c, int x_, int y_) { *bg_screen_loc_at(gba::bg_opt::screen_base_block::b62, x_, y_) = c; };
    draw_at(font_chars::arrow, x + 1, y + 1 + default_choice);
@@ -583,7 +601,7 @@ void main_game_loop() noexcept
 {
    int opt = 0;
    while (true) {
-      constexpr const char* main_options[]{"Map", "Shop", "Stats", "Load", "Save"};
+      constexpr const char* main_options[]{"Map", "Shop", "Equip", "Re-order", "New char", "Load", "Save"};
       const auto start_screen = gba::bg_screen_loc(gba::bg_opt::screen_base_block::b62);
       gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
       opt = menu(std::span{main_options}, 0, 0, opt, false);
@@ -592,14 +610,51 @@ void main_game_loop() noexcept
       case 0: break;
       // Shop
       case 1: break;
-      // Stats
+      // Equip
       case 2: break;
+      // Re-order
+      case 3: {
+         std::array<const char*, max_characters> names;
+         int num_chars = 0;
+         int longest_name = 0;
+         for (const auto& char_ : save_data.characters) {
+            if (!char_.exists) {
+               break;
+            }
+            names[num_chars] = char_.name.data();
+            longest_name = std::max(longest_name, static_cast<int>(std::strlen(char_.name.data())));
+            num_chars += 1;
+         }
+         int choice1 = 0;
+         while (true) {
+            gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+            choice1 = menu(std::span{names.begin(), names.begin() + num_chars}, 0, 0, choice1, true);
+            if (choice1 == -1) {
+               break;
+            }
+            draw_menu(std::span{names.begin(), names.begin() + num_chars}, 0, 0, choice1);
+            const auto choice2 = menu(
+               std::span{names.begin(), names.begin() + num_chars}, std::min(14, longest_name + 3), 0, choice1, true);
+            if (choice2 != -1) {
+               std::swap(save_data.characters[choice1], save_data.characters[choice2]);
+               choice1 = choice2;
+            }
+         }
+      } break;
+      // New char
+      case 4: break;
       // Load
-      case 3: load_game(); break;
+      case 5: load_game(); break;
       // Save
-      case 4: {
+      case 6: {
          const auto loc = select_file_data("to save to.", false);
          if (loc != -1) {
+            // Find the snake and copy the level to the file data
+            const auto snake_it
+               = std::find_if(save_data.characters.begin(), save_data.characters.end(), [](const auto& c) {
+                    return c.class_ == class_ids::snake;
+                 });
+            save_data.file_level = snake_it->level;
             global_data.last_file_select = loc;
             write_global_save_data(global_data);
             sram_write(save_data, file_save_loc(loc));
@@ -621,14 +676,27 @@ int main()
          }
       }
       else if (selection == title_selection::new_game) {
+         // Set-up initial stats/characters
          save_data.frame_count = 0;
          auto& snake = save_data.characters[0];
          snake.bases = default_snake_base_stats;
          snake.level = 1;
          snake.calc_stats(false);
          snake.fully_heal();
-         snake.class_name = "Snake";
+         snake.class_ = class_ids::snake;
          snake.name = do_naming_screen("Name a snake!", 13);
+         snake.exists = true;
+         for (int i = 1; i != 3; ++i) {
+            auto& minion = save_data.characters[i];
+            minion.bases = default_snake_minion_stats;
+            minion.level = 1;
+            minion.calc_stats(false);
+            minion.fully_heal();
+            minion.class_ = class_ids::snake_minion;
+            minion.exists = true;
+         }
+         save_data.characters[1].name = {'M', 'i', 'n', 'i', 'o', 'n', '1', '\0'};
+         save_data.characters[2].name = {'M', 'i', 'n', 'i', 'o', 'n', '2', '\0'};
          save_data.file_name = snake.name;
          save_data.file_level = snake.level;
          main_game_loop();
