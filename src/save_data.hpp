@@ -14,10 +14,12 @@ struct global_save_data {
    std::int8_t last_file_select;
 };
 
+constexpr std::array<char, 4> file_exists_text{{'P', 'e', 'k', '2'}};
+
 struct file_save_data {
-   std::array<char, 4> exists_text;
+   std::array<char, 4> exists_text = file_exists_text;
    std::array<character, 16> characters;
-   std::array<item, 54> items;
+   std::array<item, 48> items;
    std::uint32_t progress;
    std::array<char, 16> file_name;
    std::int32_t file_level;
@@ -30,8 +32,6 @@ struct file_load_data {
    std::int32_t file_level;
    std::uint64_t frame_count;
 };
-
-constexpr std::array<char, 4> file_exists_text{{'P', 'e', 'k', '2'}};
 
 // SRAM can only be accessed with 8-bit reads/writes so we need specialized function for access
 template<typename T>

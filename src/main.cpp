@@ -14,11 +14,24 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <span>
 #include <utility>
 
+// This isn't an enum struct because we want them to be chars
 namespace font_chars {
+
+inline constexpr char box_ul = 0x01;
+inline constexpr char box_top = 0x02;
+inline constexpr char box_ur = 0x03;
+inline constexpr char box_left_vertical = 0x04;
 inline constexpr char arrow = 0x05;
-}
+inline constexpr char hollow_arrow = 0x06;
+inline constexpr char box_bl = 0x11;
+inline constexpr char box_bottom = 0x12;
+inline constexpr char box_br = 0x13;
+inline constexpr char box_right_vertical = 0x14;
+
+} // namespace font_chars
 
 enum struct title_selection {
    new_game,
@@ -26,6 +39,15 @@ enum struct title_selection {
 };
 
 gba::keypad_status keypad;
+global_save_data global_data;
+file_save_data save_data;
+[[gnu::section(".ewram")]] file_save_data backup_data;
+
+void update_keypad_and_frame_counter() noexcept
+{
+   save_data.frame_count += 1;
+   keypad.update();
+}
 
 void disable_all_sprites() noexcept
 {
@@ -162,7 +184,7 @@ title_selection title_screen() noexcept
       while (gba::in_vblank()) {}
       while (!gba::in_vblank()) {}
 
-      keypad.update();
+      update_keypad_and_frame_counter();
 
       if (keypad.up_pressed()) {
          arrow_loc -= 1;
@@ -182,7 +204,7 @@ title_selection title_screen() noexcept
    }
 }
 
-int select_file_data(const char* prompt_finish) noexcept
+int select_file_data(const char* prompt_finish, bool file_must_exist) noexcept
 {
    constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 4> arrow_pos{
       {{3 * 8, 5 * 8}, {18 * 8, 5 * 8}, {3 * 8, 13 * 8}, {18 * 8, 13 * 8}}};
@@ -233,8 +255,11 @@ int select_file_data(const char* prompt_finish) noexcept
       if (file_exists(i)) {
          const auto data = get_file_load_data(i);
          write_bg0(data.file_name.data(), base_loc.first / 8 - 2, base_loc.second / 8 + 2);
-         write_bg0(frames_to_time(data.frame_count).data(), base_loc.first / 8 - 2, base_loc.second / 8 + 3);
+         const auto frame_str = frames_to_time(data.frame_count);
          char buffer[14];
+         buffer[13] = '\0';
+         fmt::format_to_n(buffer, std::size(buffer) - 1, "{: >13}", frame_str.data());
+         write_bg0(buffer, base_loc.first / 8 - 2, base_loc.second / 8 + 3);
          fmt::format_to_n(buffer, std::size(buffer) - 1, "Lv.{: <10}", data.file_level);
          write_bg0(buffer, base_loc.first / 8 - 2, base_loc.second / 8 + 5);
       }
@@ -263,7 +288,7 @@ int select_file_data(const char* prompt_finish) noexcept
       while (gba::in_vblank()) {}
       while (!gba::in_vblank()) {}
 
-      keypad.update();
+      update_keypad_and_frame_counter();
 
       if (keypad.soft_reset_buttons_held()) {
          gba::soft_reset();
@@ -285,7 +310,9 @@ int select_file_data(const char* prompt_finish) noexcept
       arrow_loc = std::clamp(arrow_loc, 0, 3);
 
       if (keypad.a_pressed()) {
-         return arrow_loc;
+         if (!file_must_exist || file_exists(arrow_loc)) {
+            return arrow_loc;
+         }
       }
       else if (keypad.b_pressed()) {
          return -1;
@@ -307,7 +334,7 @@ std::array<char, 16> do_naming_screen(const char* prompt, int max_length) noexce
        {'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', ',', '-'},
        {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '/', '\\', '|'},
        {'!', '"', '#', '$', '%', '&', '\'', '(', ')', '^', '_', '`', '[', ']'},
-       {'{', '}', '~', '<', '=', '>', ':', ';', '@', ' ', ' ', ' ', ' ', ' '}}};
+       {'{', '}', '~', '<', '=', '>', ':', ';', '@', '?', ' ', ' ', ' ', ' '}}};
    disable_all_sprites();
 
    {
@@ -364,11 +391,12 @@ std::array<char, 16> do_naming_screen(const char* prompt, int max_length) noexce
    int arrow_x = 0;
    int arrow_y = 0;
    int write_loc = 0;
+   write_bg0("_", 1, 3);
    while (true) {
       while (gba::in_vblank()) {}
       while (!gba::in_vblank()) {}
 
-      keypad.update();
+      update_keypad_and_frame_counter();
 
       if (keypad.soft_reset_buttons_held()) {
          gba::soft_reset();
@@ -389,8 +417,18 @@ std::array<char, 16> do_naming_screen(const char* prompt, int max_length) noexce
 
       constexpr int max_arrow_x = character_mapping[0].size() - 1;
       constexpr int max_arrow_y = character_mapping.size() - 1;
-      arrow_x = std::clamp(arrow_x, 0, max_arrow_x);
-      arrow_y = std::clamp(arrow_y, 0, max_arrow_y);
+      if (arrow_x < 0) {
+         arrow_x = max_arrow_x;
+      }
+      else if (arrow_x > max_arrow_x) {
+         arrow_x = 0;
+      }
+      if (arrow_y < 0) {
+         arrow_y = max_arrow_y;
+      }
+      else if (arrow_y > max_arrow_y) {
+         arrow_y = 0;
+      }
 
       arrow_obj.set_loc(8 + arrow_x * 16, 6 * 8 + arrow_y * 16);
 
@@ -398,6 +436,9 @@ std::array<char, 16> do_naming_screen(const char* prompt, int max_length) noexce
          to_ret[write_loc] = character_mapping[arrow_y][arrow_x];
          write_loc += 1;
          write_bg0_n(to_ret.data(), write_loc, 1, 3);
+         if (write_loc < max_length) {
+            write_bg0("_", write_loc + 1, 3);
+         }
       }
 
       if (keypad.b_pressed() && write_loc > 0) {
@@ -406,10 +447,164 @@ std::array<char, 16> do_naming_screen(const char* prompt, int max_length) noexce
          // Rewrite spaces to clear the previous letters (16 spaces)
          write_bg0("                ", 1, 3);
          write_bg0_n(to_ret.data(), write_loc, 1, 3);
+         write_bg0("_", write_loc + 1, 3);
       }
 
       if (keypad.start_pressed()) {
          return to_ret;
+      }
+   }
+}
+
+void draw_box(gba::bg_opt::screen_base_block loc, int x, int y, int width, int height) noexcept
+{
+   const auto draw_at = [loc](char c, int x_, int y_) { *bg_screen_loc_at(loc, x_, y_) = c; };
+   // draw the top and bottom
+   draw_at(font_chars::box_ul, x, y);
+   draw_at(font_chars::box_bl, x, y + height - 1);
+   for (int i = 0; i < width - 2; ++i) {
+      draw_at(font_chars::box_top, x + 1 + i, y);
+      draw_at(font_chars::box_bottom, x + 1 + i, y + height - 1);
+   }
+   draw_at(font_chars::box_ur, x + width - 1, y);
+   draw_at(font_chars::box_br, x + width - 1, y + height - 1);
+   // draw the sides
+   for (int i = 0; i < height - 2; ++i) {
+      draw_at(font_chars::box_left_vertical, x, y + 1 + i);
+      draw_at(font_chars::box_right_vertical, x + width - 1, y + 1 + i);
+   }
+}
+
+void draw_menu(std::span<const char* const> options, int x, int y, int blank_arrow_loc = -1) noexcept
+{
+   const int max_len = [&]() {
+      int max_so_far = 0;
+      for (const auto& opt : options) {
+         max_so_far = std::max(max_so_far, static_cast<int>(std::strlen(opt)));
+      }
+      return max_so_far;
+   }();
+
+   {
+      using namespace gba::bg_opt;
+      gba::bg0.set_options(gba::bg_options{}
+                              .set(priority::p0)
+                              .set(char_base_block::b0)
+                              .set(mosaic::disable)
+                              .set(colors_palettes::c16_p16)
+                              .set(screen_base_block::b62)
+                              .set(display_area_overflow::transparent)
+                              .set(screen_size::text_256x256));
+   }
+   {
+      using namespace gba::lcd_opt;
+      gba::lcd.set_options(gba::lcd_options{}
+                              .set(bg_mode::mode_0)
+                              .set(forced_blank::off)
+                              .set(display_bg0::on)
+                              .set(display_bg1::off)
+                              .set(display_bg2::off)
+                              .set(display_bg3::off)
+                              .set(display_obj::off)
+                              .set(display_window_0::off)
+                              .set(display_window_1::off)
+                              .set(display_window_obj::off)
+                              .set(obj_char_mapping::one_dimensional));
+   }
+
+   draw_box(gba::bg_opt::screen_base_block::b62, x, y, max_len + 3, options.size() + 2);
+   for (int i = 0; i != std::ssize(options); ++i) {
+      write_at(gba::bg_opt::screen_base_block::b62, options[i], x + 2, y + 1 + i);
+   }
+
+   if (blank_arrow_loc != -1) {
+      *bg_screen_loc_at(gba::bg_opt::screen_base_block::b62, x + 1, y + 1 + blank_arrow_loc) = font_chars::hollow_arrow;
+   }
+}
+
+int menu(std::span<const char* const> options, int x, int y, int default_choice, bool allow_cancel) noexcept
+{
+   draw_menu(options, x, y);
+   const auto draw_at
+      = [](char c, int x_, int y_) { *bg_screen_loc_at(gba::bg_opt::screen_base_block::b62, x_, y_) = c; };
+   draw_at(font_chars::arrow, x + 1, y + 1 + default_choice);
+
+   const int num_choices = options.size();
+   int choice = default_choice;
+   while (true) {
+      while (gba::in_vblank()) {}
+      while (!gba::in_vblank()) {}
+
+      update_keypad_and_frame_counter();
+
+      if (keypad.up_repeat()) {
+         draw_at(' ', x + 1, y + 1 + choice);
+         choice -= 1;
+      }
+      else if (keypad.down_repeat()) {
+         draw_at(' ', x + 1, y + 1 + choice);
+         choice += 1;
+      }
+
+      if (choice < 0) {
+         choice = num_choices - 1;
+      }
+      else if (choice >= num_choices) {
+         choice = 0;
+      }
+
+      draw_at(font_chars::arrow, x + 1, y + 1 + choice);
+
+      if (keypad.a_pressed()) {
+         return choice;
+      }
+      if (keypad.b_pressed() && allow_cancel) {
+         return -1;
+      }
+
+      if (keypad.soft_reset_buttons_held()) {
+         gba::soft_reset();
+      }
+   }
+}
+
+int load_game() noexcept
+{
+   const auto loc = select_file_data("to load from.", true);
+   if (loc != -1) {
+      global_data.last_file_select = loc;
+      write_global_save_data(global_data);
+      save_data = sram_read<file_save_data>(file_save_loc(loc));
+   }
+   return loc;
+}
+
+void main_game_loop() noexcept
+{
+   int opt = 0;
+   while (true) {
+      constexpr const char* main_options[]{"Map", "Shop", "Stats", "Load", "Save"};
+      const auto start_screen = gba::bg_screen_loc(gba::bg_opt::screen_base_block::b62);
+      gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+      opt = menu(std::span{main_options}, 0, 0, opt, false);
+      switch (opt) {
+      // Map
+      case 0: break;
+      // Shop
+      case 1: break;
+      // Stats
+      case 2: break;
+      // Load
+      case 3: load_game(); break;
+      // Save
+      case 4: {
+         const auto loc = select_file_data("to save to.", false);
+         if (loc != -1) {
+            global_data.last_file_select = loc;
+            write_global_save_data(global_data);
+            sram_write(save_data, file_save_loc(loc));
+         }
+      } break;
       }
    }
 }
@@ -421,22 +616,22 @@ int main()
       const auto selection = title_screen();
       common_tile_and_palette_setup();
       if (selection == title_selection::continue_) {
-         const auto loc = select_file_data("to load from.");
-         if (loc != -1) {
-            global_save_data data;
-            data.last_file_select = loc;
-            write_global_save_data(data);
-            file_save_data file_data;
-            file_data.exists_text = file_exists_text;
-            const char file_name[] = "hello it me";
-            std::copy(std::begin(file_name), std::end(file_name), file_data.file_name.data());
-            file_data.file_level = 10;
-            file_data.frame_count = 0x7FFF'FFFF;
-            sram_write(file_data, file_save_loc(loc));
+         if (load_game() != -1) {
+            main_game_loop();
          }
       }
       else if (selection == title_selection::new_game) {
-         do_naming_screen("Name a snake!", 13);
+         save_data.frame_count = 0;
+         auto& snake = save_data.characters[0];
+         snake.bases = default_snake_base_stats;
+         snake.level = 1;
+         snake.calc_stats(false);
+         snake.fully_heal();
+         snake.class_name = "Snake";
+         snake.name = do_naming_screen("Name a snake!", 13);
+         save_data.file_name = snake.name;
+         save_data.file_level = snake.level;
+         main_game_loop();
       }
    }
 }

@@ -896,7 +896,7 @@ struct keypad_status {
       for (auto&& [counter, func] : repeat_info) {
          if ((this->*func)()) {
             counter += 1;
-            counter %= 6;
+            counter %= 8;
          }
          else {
             counter = 0;
