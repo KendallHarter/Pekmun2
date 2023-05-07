@@ -7,7 +7,9 @@
 
 struct item {
    bool exists = false;
-   const char* name;
+   std::uint8_t item_name;
+   std::uint8_t move;
+   std::uint8_t jump;
    std::int64_t hp;
    std::int64_t mp;
    std::int32_t attack;
@@ -27,11 +29,12 @@ struct base_stats {
    std::uint8_t m_defense;
    std::uint8_t speed;
    std::uint8_t hit;
+   std::uint8_t move;
+   std::uint8_t jump;
 };
 
 struct character {
    bool exists = false;
-   bool is_enemy = false;
    std::uint8_t class_;
    base_stats bases;
    std::array<char, 16> name;
@@ -47,6 +50,7 @@ struct character {
    std::int32_t speed;
    std::int32_t hit;
    std::array<item, 4> equips;
+   std::int32_t exp = 0;
 
    // Calc stats DOES NOT set HP/MP; just the max values
    void calc_stats(bool randomize) noexcept
@@ -60,14 +64,14 @@ struct character {
           {speed, bases.speed},
           {hit, bases.hit}}};
       for (auto& [stat, base] : stats_and_bases) {
-         const int random_factor = randomize ? std::uniform_int_distribution<int>{75, 125}(prng) : 100;
-         stat = base * (level + 3) * random_factor / 100;
+         const int random_factor = randomize ? std::uniform_int_distribution<int>{950, 1050}(prng) : 1000;
+         stat = base * (level + 3) * random_factor / 1000;
       }
       const std::array<std::pair<std::int64_t&, std::uint8_t&>, 2> stats_and_bases2{
          {{max_hp, bases.hp}, {max_mp, bases.mp}}};
       for (auto& [stat, base] : stats_and_bases2) {
-         const int random_factor = randomize ? std::uniform_int_distribution<int>{75, 125}(prng) : 100;
-         stat = base * 2 * (level + 3) * random_factor / 100;
+         const int random_factor = randomize ? std::uniform_int_distribution<int>{950, 1050}(prng) : 1000;
+         stat = base * 2 * (level + 3) * random_factor / 1000;
       }
    }
 
@@ -76,12 +80,32 @@ struct character {
       hp = max_hp;
       mp = max_mp;
    }
+
+   std::int32_t remaining_exp() const noexcept { return 50 * level - exp; }
 };
 
 inline constexpr base_stats default_snake_base_stats{
-   .hp = 10, .mp = 5, .attack = 10, .defense = 5, .m_attack = 10, .m_defense = 5, .speed = 5, .hit = 10};
+   .hp = 10,
+   .mp = 5,
+   .attack = 10,
+   .defense = 5,
+   .m_attack = 10,
+   .m_defense = 5,
+   .speed = 5,
+   .hit = 10,
+   .move = 5,
+   .jump = 5};
 
 inline constexpr base_stats default_snake_minion_stats{
-   .hp = 7, .mp = 3, .attack = 7, .defense = 4, .m_attack = 7, .m_defense = 4, .speed = 4, .hit = 7};
+   .hp = 7,
+   .mp = 3,
+   .attack = 7,
+   .defense = 4,
+   .m_attack = 7,
+   .m_defense = 4,
+   .speed = 4,
+   .hit = 7,
+   .move = 4,
+   .jump = 3};
 
 #endif // DATA_HPP

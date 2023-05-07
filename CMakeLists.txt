@@ -7,10 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 function(clone_repo name url tag)
-   execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/repos/${name})
-   execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/repo_versions/)
-   if (EXISTS ${CMAKE_BINARY_DIR}/repo_versions/${name})
-      file(READ ${CMAKE_BINARY_DIR}/repo_versions/${name} version)
+   execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/repos/${name}")
+   execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/repo_versions/")
+   if (EXISTS "${CMAKE_CURRENT_BINARY_DIR}/repo_versions/${name}")
+      file(READ "${CMAKE_CURRENT_BINARY_DIR}/repo_versions/${name}" version)
       if (${version} STREQUAL ${tag})
          return()
       endif()
@@ -20,7 +20,7 @@ function(clone_repo name url tag)
    function(gcmd)
       execute_process(
          COMMAND ${GIT_EXECUTABLE} ${ARGV}
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/repos/${name}
+         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/repos/${name}"
       )
    endfunction()
 
@@ -28,13 +28,15 @@ function(clone_repo name url tag)
    gcmd(remote add origin ${url})
    gcmd(fetch --depth 1 origin ${tag})
    gcmd(checkout FETCH_HEAD)
-   file(WRITE ${CMAKE_BINARY_DIR}/repo_versions/${name} ${tag})
+   # In case of sub-modules
+   gcmd(submodule update --init)
+   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/repo_versions/${name}" ${tag})
 endfunction()
 
 clone_repo(libfmt git@github.com:fmtlib/fmt.git 9.1.0)
 # Disable OS support
 set(FMT_OS OFF)
-add_subdirectory(${CMAKE_BINARY_DIR}/repos/libfmt)
+add_subdirectory("${CMAKE_CURRENT_BINARY_DIR}/repos/libfmt")
 
 function(fix_gba_target target)
    add_custom_command(TARGET ${target} POST_BUILD
@@ -101,7 +103,8 @@ function(process_map input_map output_name)
 endfunction()
 
 # We're always going to be GCC based so can just add these
-add_compile_options(-Wall -Wextra -Wpedantic)
+# Disable ABI change warnings because we don't care about them
+add_compile_options(-Wall -Wextra -Wpedantic -Wno-psabi)
 
 add_executable(pekmun2 src/main.cpp)
 fix_gba_target(pekmun2)

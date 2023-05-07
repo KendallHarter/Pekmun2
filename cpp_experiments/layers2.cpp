@@ -101,6 +101,10 @@ int main()
       write_bg0("(Nothing)", 13, 9);
       write_bg0("(Nothing)", 13, 10);
 
+      // Move and jump
+      write_bg0(" 25", 26, 8);
+      write_bg0("  8", 26, 10);
+
       // Attack, Defense, M. Attack, M. Defense, Hit, Speed
       write_bg0("       20", 1, 8);
       write_bg0("        7", 1, 10);

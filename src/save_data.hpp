@@ -24,7 +24,8 @@ struct file_save_data {
    std::array<char, 4> exists_text = file_exists_text;
    std::array<character, max_characters> characters;
    std::array<item, max_items> items;
-   std::uint32_t progress;
+   std::uint8_t chapter = 0;
+   std::uint8_t chapter_progress = 0;
    std::array<char, 16> file_name;
    std::int32_t file_level;
    std::uint64_t frame_count;

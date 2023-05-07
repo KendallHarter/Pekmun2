@@ -3,12 +3,14 @@
 #include "generated/file_select.hpp"
 #include "generated/font.hpp"
 #include "generated/naming_screen.hpp"
+#include "generated/stats_screen.hpp"
 #include "generated/test_tileset.hpp"
 #include "generated/title.hpp"
 
 #include "classes.hpp"
 #include "data.hpp"
 #include "save_data.hpp"
+#include "static_vector.hpp"
 
 #include "fmt/core.h"
 
@@ -597,6 +599,111 @@ int load_game() noexcept
    return loc;
 }
 
+static_vector<const char*, max_characters> get_character_names() noexcept
+{
+   static_vector<const char*, max_characters> to_ret;
+   for (const auto& char_ : save_data.characters) {
+      if (!char_.exists) {
+         break;
+      }
+      to_ret.push_back(char_.name.data());
+   }
+   return to_ret;
+}
+
+void display_stats(std::span<character> char_list, int index, bool allow_equipping) noexcept
+{
+   disable_all_sprites();
+
+   {
+      using namespace gba::bg_opt;
+      gba::bg0.set_options(gba::bg_options{}
+                              .set(priority::p0)
+                              .set(char_base_block::b0)
+                              .set(mosaic::disable)
+                              .set(colors_palettes::c16_p16)
+                              .set(screen_base_block::b62)
+                              .set(display_area_overflow::transparent)
+                              .set(screen_size::text_256x256));
+      gba::copy_tilemap(stats_screen, screen_base_block::b62);
+   }
+   {
+      using namespace gba::lcd_opt;
+      gba::lcd.set_options(gba::lcd_options{}
+                              .set(bg_mode::mode_0)
+                              .set(forced_blank::off)
+                              .set(display_bg0::on)
+                              .set(display_bg1::off)
+                              .set(display_bg2::off)
+                              .set(display_bg3::off)
+                              .set(display_obj::on)
+                              .set(display_window_0::off)
+                              .set(display_window_1::off)
+                              .set(display_window_obj::off)
+                              .set(obj_char_mapping::one_dimensional));
+   }
+
+   const auto write_bg0 = [&](const char* c, int x, int y) { write_at(gba::bg_opt::screen_base_block::b62, c, x, y); };
+   // TODO: Can probably make this generic as "convert number" or something
+   const auto disp_core_stat = [&](std::int32_t stat, int x, int y) {
+      char buffer[10];
+      buffer[9] = '\0';
+      fmt::format_to_n(buffer, std::size(buffer) - 1, "{: >9}", stat);
+      write_bg0(buffer, x, y);
+   };
+   const auto disp_mv_jmp = [&](std::uint8_t stat, int x, int y) {
+      char buffer[4];
+      buffer[3] = '\0';
+      fmt::format_to_n(buffer, std::size(buffer) - 1, "{: >3}", stat);
+      write_bg0(buffer, x, y);
+   };
+   const auto disp_hp_mp = [&](std::uint64_t stat, std::uint64_t max_stat, int x, int y) {
+      // TODO: Split across two lines when the stat gets too large
+      char buffer[18];
+      buffer[17] = '\0';
+      fmt::format_to_n(buffer, std::size(buffer) - 1, "{}/{}", stat, max_stat);
+      write_bg0(buffer, x, y);
+   };
+
+   const auto display_stats = [&](const character& char_) {
+      write_bg0(char_.name.data(), 1, 1);
+      write_bg0(class_names[char_.class_], 1, 3);
+      disp_core_stat(char_.attack, 1, 8);
+      disp_core_stat(char_.defense, 1, 10);
+      disp_core_stat(char_.m_attack, 1, 12);
+      disp_core_stat(char_.m_defense, 1, 14);
+      disp_core_stat(char_.hit, 1, 16);
+      disp_core_stat(char_.speed, 1, 18);
+      disp_core_stat(char_.level, 16, 2);
+      disp_core_stat(char_.remaining_exp(), 16, 4);
+      disp_mv_jmp(char_.bases.move, 26, 8);
+      disp_mv_jmp(char_.bases.jump, 26, 10);
+      disp_hp_mp(char_.hp, char_.max_hp, 12, 14);
+      disp_hp_mp(char_.mp, char_.max_mp, 12, 17);
+
+      for (int i = 0; i != static_cast<int>(char_.equips.size()); ++i) {
+         const auto& equip = char_.equips[i];
+         if (equip.exists) {
+            ;
+         }
+         else {
+            write_bg0("(Nothing)", 13, 7 + i);
+         }
+      }
+   };
+
+   if (allow_equipping) {
+      display_stats(char_list[index]);
+      constexpr std::array<const char*, 4> dummy_menu_opts{"", "", "", ""};
+      const auto choice = menu(dummy_menu_opts, 11, 6, 0, true, false);
+   }
+   else {
+      while (true) {
+         ;
+      }
+   }
+}
+
 void main_game_loop() noexcept
 {
    int opt = 0;
@@ -611,30 +718,33 @@ void main_game_loop() noexcept
       // Shop
       case 1: break;
       // Equip
-      case 2: break;
+      case 2: {
+         auto choice = 0;
+         while (choice != -1) {
+            gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+            draw_menu(std::span{main_options}, 0, 0, opt);
+            choice = menu(get_character_names(), 11, 0, choice, true);
+            if (choice != -1) {
+               display_stats(save_data.characters, choice, true);
+            }
+         }
+      } break;
       // Re-order
       case 3: {
-         std::array<const char*, max_characters> names;
-         int num_chars = 0;
+         const auto names = get_character_names();
          int longest_name = 0;
-         for (const auto& char_ : save_data.characters) {
-            if (!char_.exists) {
-               break;
-            }
-            names[num_chars] = char_.name.data();
-            longest_name = std::max(longest_name, static_cast<int>(std::strlen(char_.name.data())));
-            num_chars += 1;
+         for (const auto& name : names) {
+            longest_name = std::max(longest_name, static_cast<int>(std::strlen(name)));
          }
          int choice1 = 0;
          while (true) {
             gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
-            choice1 = menu(std::span{names.begin(), names.begin() + num_chars}, 0, 0, choice1, true);
+            choice1 = menu(names, 0, 0, choice1, true);
             if (choice1 == -1) {
                break;
             }
-            draw_menu(std::span{names.begin(), names.begin() + num_chars}, 0, 0, choice1);
-            const auto choice2 = menu(
-               std::span{names.begin(), names.begin() + num_chars}, std::min(14, longest_name + 3), 0, choice1, true);
+            draw_menu(names, 0, 0, choice1);
+            const auto choice2 = menu(names, std::min(14, longest_name + 3), 0, choice1, true);
             if (choice2 != -1) {
                std::swap(save_data.characters[choice1], save_data.characters[choice2]);
                choice1 = choice2;
