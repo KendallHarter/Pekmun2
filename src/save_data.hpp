@@ -97,7 +97,6 @@ inline std::array<char, 14> frames_to_time(std::uint64_t frame_count) noexcept
    const auto minutes = seconds / 60;
    const auto hours = minutes / 60;
    fmt::format_to_n(to_ret.data(), std::size(to_ret) - 1, "{}:{:0>2}:{:0>2}", hours, minutes % 60, seconds % 60);
-   // fmt::format_to_n(to_ret.data(), std::size(to_ret) - 1, "{}", frame_count);
    return to_ret;
 }
 

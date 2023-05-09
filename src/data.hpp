@@ -2,6 +2,7 @@
 #define DATA_HPP
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <random>
 
@@ -65,13 +66,13 @@ struct character {
           {hit, bases.hit}}};
       for (auto& [stat, base] : stats_and_bases) {
          const int random_factor = randomize ? std::uniform_int_distribution<int>{950, 1050}(prng) : 1000;
-         stat = base * (level + 3) * random_factor / 1000;
+         stat = base * std::pow(level + 3, 1.05) * random_factor / 1000;
       }
       const std::array<std::pair<std::int64_t&, std::uint8_t&>, 2> stats_and_bases2{
          {{max_hp, bases.hp}, {max_mp, bases.mp}}};
       for (auto& [stat, base] : stats_and_bases2) {
          const int random_factor = randomize ? std::uniform_int_distribution<int>{950, 1050}(prng) : 1000;
-         stat = base * 2 * (level + 3) * random_factor / 1000;
+         stat = base * 2 * std::pow(level + 3, 1.25) * random_factor / 1000;
       }
    }
 
@@ -81,7 +82,11 @@ struct character {
       mp = max_mp;
    }
 
-   std::int32_t remaining_exp() const noexcept { return 50 * level - exp; }
+   std::int32_t remaining_exp() const noexcept
+   {
+      const auto exp_needed = std::min(50 * static_cast<std::int64_t>(level), static_cast<std::int64_t>(999'999'999));
+      return exp_needed - exp;
+   }
 };
 
 inline constexpr base_stats default_snake_base_stats{

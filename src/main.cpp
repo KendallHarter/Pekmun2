@@ -9,6 +9,7 @@
 
 #include "classes.hpp"
 #include "data.hpp"
+#include "map_data.hpp"
 #include "save_data.hpp"
 #include "static_vector.hpp"
 
@@ -611,7 +612,7 @@ static_vector<const char*, max_characters> get_character_names() noexcept
    return to_ret;
 }
 
-void display_stats(std::span<character> char_list, int index, bool allow_equipping) noexcept
+int display_stats(std::span<character> char_list, int index, bool allow_equipping) noexcept
 {
    disable_all_sprites();
 
@@ -625,7 +626,6 @@ void display_stats(std::span<character> char_list, int index, bool allow_equippi
                               .set(screen_base_block::b62)
                               .set(display_area_overflow::transparent)
                               .set(screen_size::text_256x256));
-      gba::copy_tilemap(stats_screen, screen_base_block::b62);
    }
    {
       using namespace gba::lcd_opt;
@@ -658,14 +658,24 @@ void display_stats(std::span<character> char_list, int index, bool allow_equippi
       write_bg0(buffer, x, y);
    };
    const auto disp_hp_mp = [&](std::uint64_t stat, std::uint64_t max_stat, int x, int y) {
-      // TODO: Split across two lines when the stat gets too large
-      char buffer[18];
-      buffer[17] = '\0';
-      fmt::format_to_n(buffer, std::size(buffer) - 1, "{}/{}", stat, max_stat);
+      char buffer[38];
+      std::fill(std::begin(buffer), std::end(buffer), '\0');
+      // If we have enough digits in the max stat split onto two lines if if'd be too large with full stat
+      if (stat > 99'999'999) {
+         fmt::format_to_n(buffer, std::size(buffer) - 1, "{: <17}\n /{: <15}", stat, max_stat);
+      }
+      else {
+         char buffer2[18];
+         fmt::format_to_n(buffer2, std::size(buffer2) - 1, "{}/{}", stat, max_stat);
+         fmt::format_to_n(buffer, std::size(buffer) - 1, "{: <17}\n{: <17}", buffer2, "");
+      }
       write_bg0(buffer, x, y);
    };
 
    const auto display_stats = [&](const character& char_) {
+      const auto start_fill = gba::bg_screen_loc(gba::bg_opt::screen_base_block::b62);
+      gba::dma3_fill(start_fill, start_fill + 32 * 32, ' ');
+      gba::copy_tilemap(stats_screen, gba::bg_opt::screen_base_block::b62);
       write_bg0(char_.name.data(), 1, 1);
       write_bg0(class_names[char_.class_], 1, 3);
       disp_core_stat(char_.attack, 1, 8);
@@ -690,16 +700,61 @@ void display_stats(std::span<character> char_list, int index, bool allow_equippi
             write_bg0("(Nothing)", 13, 7 + i);
          }
       }
+
+      // Display the sprite
+      {
+         using namespace gba::obj_opt;
+         const auto char_obj = gba::obj{0};
+         char_obj.set_attr0(
+            gba::obj_attr0_options{}.set(display::enable).set(mode::normal).set(mosaic::disable).set(shape::vertical));
+         char_obj.set_attr1(gba::obj_attr1_options{}.set(size::h32x16).set(vflip::disable).set(hflip::disable));
+         char_obj.set_tile_and_attr2(0, gba::obj_attr2_options{}.set(palette_num::p1).set(priority::p0));
+         char_obj.set_x(27 * 8);
+         char_obj.set_y(1 * 8);
+
+         // TODO: Replace these with dynamic stuff
+         gba::dma3_copy(std::begin(snake), std::end(snake), gba::base_obj_tile_addr(0));
+         gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), gba::obj_palette_addr(1));
+      }
    };
 
+   display_stats(char_list[index]);
    if (allow_equipping) {
-      display_stats(char_list[index]);
-      constexpr std::array<const char*, 4> dummy_menu_opts{"", "", "", ""};
-      const auto choice = menu(dummy_menu_opts, 11, 6, 0, true, false);
+      int choice = 0;
+      while (true) {
+         constexpr std::array<const char*, 4> dummy_menu_opts{"", "", "", ""};
+         choice = menu(dummy_menu_opts, 11, 6, choice, true, false);
+         // TODO: Actual equipping
+         if (choice == -1) {
+            return -1;
+         }
+      }
    }
    else {
       while (true) {
-         ;
+         while (gba::in_vblank()) {}
+         while (!gba::in_vblank()) {}
+
+         update_keypad_and_frame_counter();
+
+         if (keypad.b_pressed()) {
+            return index;
+         }
+         if (keypad.left_pressed() || keypad.l_pressed()) {
+            index -= 1;
+         }
+         else if (keypad.right_pressed() || keypad.r_pressed()) {
+            index += 1;
+         }
+
+         if (index < 0) {
+            index = char_list.size() - 1;
+         }
+         else if (index >= static_cast<int>(char_list.size())) {
+            index = 0;
+         }
+
+         display_stats(char_list[index]);
       }
    }
 }
@@ -714,7 +769,26 @@ void main_game_loop() noexcept
       opt = menu(std::span{main_options}, 0, 0, opt, false);
       switch (opt) {
       // Map
-      case 0: break;
+      case 0: {
+         auto ch_choice = 0;
+         while (ch_choice != -1) {
+            constexpr const char* chapters[]{"Ch.1", "Ch.2", "Ch.3", "Ch.4", "Ch.5", "Ch.6", "Ch.7"};
+            const auto chapter_choices
+               = std::span{std::begin(chapters), std::begin(chapters) + 1 + save_data.chapter_progress};
+            gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+            draw_menu(main_options, 0, 0, opt);
+            ch_choice = menu(chapter_choices, 11, 0, ch_choice, true);
+            if (ch_choice != -1) {
+               auto map_choice = 0;
+               gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+               draw_menu(main_options, 0, 0, opt);
+               draw_menu(chapter_choices, 11, 0, ch_choice);
+               while (map_choice != -1) {
+                  map_choice = menu(get_map_names(ch_choice, save_data), 0, 9, map_choice, true);
+               }
+            }
+         }
+      } break;
       // Shop
       case 1: break;
       // Equip
@@ -762,7 +836,7 @@ void main_game_loop() noexcept
             // Find the snake and copy the level to the file data
             const auto snake_it
                = std::find_if(save_data.characters.begin(), save_data.characters.end(), [](const auto& c) {
-                    return c.class_ == class_ids::snake;
+                    return c.class_ == class_ids::snake_;
                  });
             save_data.file_level = snake_it->level;
             global_data.last_file_select = loc;
@@ -793,7 +867,7 @@ int main()
          snake.level = 1;
          snake.calc_stats(false);
          snake.fully_heal();
-         snake.class_ = class_ids::snake;
+         snake.class_ = class_ids::snake_;
          snake.name = do_naming_screen("Name a snake!", 13);
          snake.exists = true;
          for (int i = 1; i != 3; ++i) {

@@ -989,7 +989,7 @@ constexpr std::uint16_t make_tile(int tile_num, int palette_num) noexcept
 }
 
 // Copy a full screen tilemap to VRAM
-void copy_tilemap(const std::uint16_t (&array)[600], bg_opt::screen_base_block loc) noexcept
+inline void copy_tilemap(const std::uint16_t (&array)[600], bg_opt::screen_base_block loc) noexcept
 {
    const auto base_dest = bg_screen_loc(loc);
    for (int y = 0; y != 20; ++y) {

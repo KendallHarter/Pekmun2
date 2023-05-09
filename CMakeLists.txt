@@ -106,7 +106,7 @@ endfunction()
 # Disable ABI change warnings because we don't care about them
 add_compile_options(-Wall -Wextra -Wpedantic -Wno-psabi)
 
-add_executable(pekmun2 src/main.cpp)
+add_executable(pekmun2 src/main.cpp src/map_data.cpp)
 fix_gba_target(pekmun2)
 
 add_executable(scrolling cpp_experiments/scrolling.cpp)
@@ -129,7 +129,7 @@ target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_D
 target_link_libraries(pekmun2 PUBLIC standard_includes fmt::fmt)
 target_link_libraries(scrolling PUBLIC standard_includes)
 target_link_libraries(layers PUBLIC standard_includes)
-target_link_libraries(layers2 PUBLIC standard_includes)
+target_link_libraries(layers2 PUBLIC standard_includes fmt::fmt)
 target_link_libraries(health_bar_test PUBLIC standard_includes fmt::fmt)
 
 process_image(font.png font)
@@ -146,7 +146,7 @@ process_bitmap_image(title.png title)
 
 process_map(test_map test_map)
 
-add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen)
+add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen snake)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)

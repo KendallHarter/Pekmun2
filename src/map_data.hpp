@@ -1,7 +1,10 @@
-#ifndef MAP_HPP
-#define MAP_HPP
+#ifndef MAP_DATA_HPP
+#define MAP_DATA_HPP
+
+#include "save_data.hpp"
 
 #include <cstdint>
+#include <span>
 
 // TODO: Same as in the Python script
 //       Is there a good way to set these programatically so it doesn't need to be manually
@@ -42,4 +45,6 @@ struct map_data {
    }
 };
 
-#endif
+std::span<const char* const> get_map_names(int chapter, const file_save_data& data) noexcept;
+
+#endif // MAP_DATA_HPP
