@@ -6,6 +6,7 @@
 #include "generated/stats_screen.hpp"
 #include "generated/test_tileset.hpp"
 #include "generated/title.hpp"
+#include "generated/win_screen.hpp"
 
 #include "classes.hpp"
 #include "data.hpp"
@@ -108,6 +109,37 @@ void common_tile_and_palette_setup()
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::obj_palette_addr(0));
 }
 
+void victory_screen() noexcept
+{
+   disable_all_sprites();
+   {
+      using namespace gba::lcd_opt;
+      gba::lcd.set_options(gba::lcd_options{}
+                              .set(bg_mode::mode_3)
+                              .set(forced_blank::off)
+                              .set(display_bg0::off)
+                              .set(display_bg1::off)
+                              .set(display_bg2::on)
+                              .set(display_bg3::off)
+                              .set(display_obj::on)
+                              .set(display_window_0::off)
+                              .set(display_window_1::off)
+                              .set(display_window_obj::off)
+                              .set(obj_char_mapping::one_dimensional));
+   }
+   gba::dma3_copy(std::begin(win_screen), std::end(win_screen), gba::bg_screen_loc(gba::bg_opt::screen_base_block::b0));
+   while (true) {
+      while (gba::in_vblank()) {}
+      while (!gba::in_vblank()) {}
+
+      update_keypad_and_frame_counter();
+
+      if (keypad.a_pressed()) {
+         break;
+      }
+   }
+}
+
 title_selection title_screen() noexcept
 {
    gba::lcd.set_options(gba::lcd_options{}.set(gba::lcd_opt::forced_blank::on));
@@ -138,8 +170,7 @@ title_selection title_screen() noexcept
          cur_obj.set_x_and_attr1(
             x + i * 8, gba::obj_attr1_options{}.set(size::s8x8).set(vflip::disable).set(hflip::disable));
          // BG3 tiles start at 512
-         cur_obj.set_tile(512 + text[i]);
-         // cur_obj.set_tile_and_attr2(512 + text[i], gba::obj_attr2_options{}.set(priority::p0).set(palette_num::p0));
+         cur_obj.set_tile_and_attr2(512 + text[i], gba::obj_attr2_options{}.set(priority::p0).set(palette_num::p0));
       }
       return i + base_obj_no;
    };
@@ -540,7 +571,8 @@ int menu(
    int y,
    int default_choice,
    bool allow_cancel,
-   bool draw_the_menu = true) noexcept
+   bool draw_the_menu = true,
+   void (*on_refresh)(int) = nullptr) noexcept
 {
    if (draw_the_menu) {
       draw_menu(options, x, y);
@@ -585,6 +617,10 @@ int menu(
 
       if (keypad.soft_reset_buttons_held()) {
          gba::soft_reset();
+      }
+
+      if (on_refresh != nullptr) {
+         on_refresh(choice);
       }
    }
 }
@@ -666,6 +702,8 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
       }
       else {
          char buffer2[18];
+         std::fill(std::begin(buffer2), std::end(buffer2), ' ');
+         buffer2[17] = '\0';
          fmt::format_to_n(buffer2, std::size(buffer2) - 1, "{}/{}", stat, max_stat);
          fmt::format_to_n(buffer, std::size(buffer) - 1, "{: <17}\n{: <17}", buffer2, "");
       }
@@ -759,6 +797,214 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
    }
 }
 
+// Returns true if the map is beaten, false otherwise
+bool do_map(const full_map_info& map_info) noexcept
+{
+   constexpr auto screen_width = 240;
+   constexpr auto screen_height = 160;
+
+   constexpr auto bg0_screen_block = gba::bg_opt::screen_base_block::b62;
+   constexpr auto bg1_screen_block = gba::bg_opt::screen_base_block::b60;
+   constexpr auto bg2_screen_block = gba::bg_opt::screen_base_block::b58;
+   constexpr auto bg3_screen_block = gba::bg_opt::screen_base_block::b56;
+
+   const auto bg0_tiles = gba::bg_screen_loc(bg0_screen_block);
+   const auto bg1_tiles = gba::bg_screen_loc(bg1_screen_block);
+   const auto bg2_tiles = gba::bg_screen_loc(bg2_screen_block);
+   const auto bg3_tiles = gba::bg_screen_loc(bg3_screen_block);
+
+   constexpr auto blank_tile = 128 + 17;
+
+   const auto tile_at = [&](const std::uint16_t* layer_data, unsigned x, unsigned y) {
+      if (x >= tilemap_width || y >= tilemap_height) {
+         return gba::make_tile(blank_tile, 1);
+      }
+      else {
+         return layer_data[x + y * 60];
+      }
+   };
+
+   int camera_x = 0;
+   int camera_y = 0;
+
+   const auto set_camera = [&](int x, int y) {
+      camera_x = -screen_width / 2 + x * 16 + y * 16;
+      camera_y = -screen_height / 2 + y * 8 - x * 8 - map_info.map->height_at(x, y) + map_info.map->y_offset * 8;
+   };
+
+   set_camera(map_info.base_x, map_info.base_y);
+
+   const auto redraw_layer = [&](const std::uint16_t* layer_data, gba::bg_opt::screen_base_block loc) {
+      // If the camera is negative we need to subtract 7 to make sure we're updating
+      // the tile that's showing at the edge
+      const auto offset_x = camera_x < 0 ? (camera_x - 7) / 8 : camera_x / 8;
+      const auto offset_y = camera_y < 0 ? (camera_y - 7) / 8 : camera_y / 8;
+      for (int y = 0; y != 21; ++y) {
+         const unsigned tile_y = y + offset_y;
+         for (int x = 0; x != 31; ++x) {
+            const unsigned tile_x = x + offset_x;
+            *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
+         }
+      }
+   };
+
+   const auto scroll_layer
+      = [&](const std::uint16_t* layer_data, gba::bg_opt::screen_base_block loc, int delta_x, int delta_y) {
+           const auto offset_x = camera_x < 0 ? (camera_x - 7) / 8 : camera_x / 8;
+           const auto offset_y = camera_y < 0 ? (camera_y - 7) / 8 : camera_y / 8;
+           // TODO: Is there a more compact way to represent this?
+           if (delta_x < 0) {
+              const auto x_scroll_amount = std::min(std::abs(delta_x - 7) / 8, 31);
+              for (int x = 0; x != x_scroll_amount; ++x) {
+                 const unsigned tile_x = x + offset_x;
+                 for (int y = 0; y != 21; ++y) {
+                    const unsigned tile_y = y + offset_y;
+                    *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
+                 }
+              }
+           }
+           else if (delta_x > 0) {
+              const auto x_scroll_amount = std::min((delta_x + 7) / 8, 31);
+              for (int x = 31 - x_scroll_amount; x != 31; ++x) {
+                 const unsigned tile_x = x + offset_x;
+                 for (int y = 0; y != 21; ++y) {
+                    const unsigned tile_y = y + offset_y;
+                    *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
+                 }
+              }
+           }
+           if (delta_y < 0) {
+              const auto y_scroll_amount = std::min(std::abs(delta_y - 7) / 8, 21);
+              for (int y = 0; y != y_scroll_amount; ++y) {
+                 const unsigned tile_y = y + offset_y;
+                 for (int x = 0; x != 31; ++x) {
+                    const unsigned tile_x = x + offset_x;
+                    *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
+                 }
+              }
+           }
+           else if (delta_y > 0) {
+              const auto y_scroll_amount = std::min((delta_y + 7) / 8, 21);
+              for (int y = 21 - y_scroll_amount; y != 21; ++y) {
+                 const unsigned tile_y = y + offset_y;
+                 for (int x = 0; x != 31; ++x) {
+                    const unsigned tile_x = x + offset_x;
+                    *bg_screen_loc_at(loc, tile_x % 32, tile_y % 32) = tile_at(layer_data, tile_x, tile_y);
+                 }
+              }
+           }
+        };
+
+   const auto init_screen = [&]() {
+      {
+         using namespace gba::bg_opt;
+         gba::bg0.set_options(gba::bg_options{}
+                                 .set(priority::p2)
+                                 .set(char_base_block::b0)
+                                 .set(mosaic::disable)
+                                 .set(colors_palettes::c16_p16)
+                                 .set(bg0_screen_block)
+                                 .set(display_area_overflow::transparent)
+                                 .set(screen_size::text_256x256));
+
+         gba::bg1.set_options(gba::bg_options{}
+                                 .set(priority::p3)
+                                 .set(char_base_block::b0)
+                                 .set(mosaic::disable)
+                                 .set(colors_palettes::c16_p16)
+                                 .set(bg1_screen_block)
+                                 .set(display_area_overflow::transparent)
+                                 .set(screen_size::text_256x256));
+
+         gba::bg2.set_options(gba::bg_options{}
+                                 .set(priority::p2)
+                                 .set(char_base_block::b0)
+                                 .set(mosaic::disable)
+                                 .set(colors_palettes::c16_p16)
+                                 .set(bg2_screen_block)
+                                 .set(display_area_overflow::transparent)
+                                 .set(screen_size::text_256x256));
+
+         gba::bg3.set_options(gba::bg_options{}
+                                 .set(priority::p3)
+                                 .set(char_base_block::b0)
+                                 .set(mosaic::disable)
+                                 .set(colors_palettes::c16_p16)
+                                 .set(bg3_screen_block)
+                                 .set(display_area_overflow::transparent)
+                                 .set(screen_size::text_256x256));
+      }
+
+      gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+      gba::dma3_fill(bg1_tiles, bg1_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+      gba::dma3_fill(bg2_tiles, bg2_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+      gba::dma3_fill(bg3_tiles, bg3_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+
+      redraw_layer(map_info.map->high_priority_tiles.data(), bg0_screen_block);
+      redraw_layer(map_info.map->low_priority_tiles.data(), bg1_screen_block);
+
+      gba::bg0.set_scroll(camera_x, camera_y);
+      gba::bg1.set_scroll(camera_x, camera_y);
+      gba::bg2.set_scroll(camera_x, camera_y);
+      gba::bg3.set_scroll(camera_x, camera_y);
+
+      {
+         using namespace gba::lcd_opt;
+         gba::lcd.set_options(gba::lcd_options{}
+                                 .set(bg_mode::mode_0)
+                                 .set(forced_blank::off)
+                                 .set(display_bg0::on)
+                                 .set(display_bg1::on)
+                                 .set(display_bg2::on)
+                                 .set(display_bg3::on)
+                                 .set(display_obj::on)
+                                 .set(display_window_0::off)
+                                 .set(display_window_1::off)
+                                 .set(display_window_obj::off)
+                                 .set(obj_char_mapping::one_dimensional));
+      }
+   };
+
+   init_screen();
+   while (true) {
+      while (gba::in_vblank()) {}
+      while (!gba::in_vblank()) {}
+
+      update_keypad_and_frame_counter();
+
+      int delta_x = 0;
+      if (keypad.left_held()) {
+         delta_x = -10;
+      }
+      else if (keypad.right_held()) {
+         delta_x = 10;
+      }
+      int delta_y = 0;
+      if (keypad.up_held()) {
+         delta_y = -10;
+      }
+      else if (keypad.down_held()) {
+         delta_y = 10;
+      }
+
+      if (keypad.start_pressed()) {
+         gba::bg0.set_scroll(0, 0);
+         return true;
+      }
+
+      camera_x += delta_x;
+      camera_y += delta_y;
+
+      gba::bg0.set_scroll(camera_x, camera_y);
+      gba::bg1.set_scroll(camera_x, camera_y);
+      gba::bg2.set_scroll(camera_x, camera_y);
+      gba::bg3.set_scroll(camera_x, camera_y);
+
+      scroll_layer(map_info.map->high_priority_tiles.data(), bg0_screen_block, delta_x, delta_y);
+      scroll_layer(map_info.map->low_priority_tiles.data(), bg1_screen_block, delta_x, delta_y);
+   }
+}
+
 void main_game_loop() noexcept
 {
    int opt = 0;
@@ -772,19 +1018,55 @@ void main_game_loop() noexcept
       case 0: {
          auto ch_choice = 0;
          while (ch_choice != -1) {
+            // We may not end up using all 7 chapters but just in case have them ready
             constexpr const char* chapters[]{"Ch.1", "Ch.2", "Ch.3", "Ch.4", "Ch.5", "Ch.6", "Ch.7"};
-            const auto chapter_choices
-               = std::span{std::begin(chapters), std::begin(chapters) + 1 + save_data.chapter_progress};
+            const auto get_chapter_choices = [&]() {
+               return std::span{std::begin(chapters), std::begin(chapters) + 1 + save_data.chapter};
+            };
             gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
             draw_menu(main_options, 0, 0, opt);
-            ch_choice = menu(chapter_choices, 11, 0, ch_choice, true);
+            ch_choice = menu(get_chapter_choices(), 11, 0, ch_choice, true);
             if (ch_choice != -1) {
                auto map_choice = 0;
-               gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
-               draw_menu(main_options, 0, 0, opt);
-               draw_menu(chapter_choices, 11, 0, ch_choice);
                while (map_choice != -1) {
+                  gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+                  draw_menu(main_options, 0, 0, opt);
+                  draw_menu(get_chapter_choices(), 11, 0, ch_choice);
                   map_choice = menu(get_map_names(ch_choice, save_data), 0, 9, map_choice, true);
+                  if (map_choice != -1) {
+                     backup_data = save_data;
+                     if (do_map(get_map_data_and_enemies(ch_choice, map_choice))) {
+                        if (ch_choice == save_data.chapter && map_choice == save_data.chapter_progress) {
+                           save_data.chapter_progress += 1;
+                           if (save_data.chapter_progress == 9) {
+                              if (save_data.chapter != num_chapters - 1) {
+                                 save_data.chapter += 1;
+                                 save_data.chapter_progress = 0;
+                                 draw_menu(get_chapter_choices(), 11, 0, ch_choice);
+                              }
+                              else {
+                                 // Last map completed!
+                                 if (!save_data.game_completed) {
+                                    save_data.game_completed = true;
+                                    victory_screen();
+                                    gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
+                                    common_tile_and_palette_setup();
+                                    draw_menu(main_options, 0, 0, opt);
+                                    draw_menu(get_chapter_choices(), 11, 0, ch_choice);
+                                 }
+                                 save_data.chapter_progress = 8;
+                              }
+                           }
+                           else {
+                              map_choice += 1;
+                           }
+                        }
+                     }
+                     else {
+                        // Load the old data
+                        save_data = backup_data;
+                     }
+                  }
                }
             }
          }

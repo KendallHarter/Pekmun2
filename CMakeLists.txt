@@ -143,10 +143,12 @@ process_fullscreen_tilemap(file_select.json file_select)
 process_fullscreen_tilemap(naming_screen.json naming_screen)
 
 process_bitmap_image(title.png title)
+process_bitmap_image(win.png win_screen)
 
 process_map(test_map test_map)
+process_map(test_layers test_layers)
 
-add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen snake)
+add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen snake win_screen test_layers)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)

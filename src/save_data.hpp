@@ -22,6 +22,8 @@ inline constexpr int max_items = 48;
 
 struct file_save_data {
    std::array<char, 4> exists_text = file_exists_text;
+   bool game_completed = false;
+   std::uint16_t enemy_strength = 0;
    std::array<character, max_characters> characters;
    std::array<item, max_items> items;
    std::uint8_t chapter = 0;
@@ -29,7 +31,7 @@ struct file_save_data {
    std::array<char, 16> file_name;
    std::int32_t file_level;
    std::uint64_t frame_count;
-   std::uint64_t money;
+   std::uint64_t money = 0;
 };
 
 struct file_load_data {

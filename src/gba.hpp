@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 
 #ifdef NDEBUG
    #define GBA_ASSERT(cond) (void)(cond)
@@ -969,18 +970,6 @@ private:
 };
 
 inline bool in_vblank() noexcept { return *(volatile std::uint16_t*)(0x4000004) & 1; }
-
-// This is a common enough operation to have a function for it
-template<typename T, std::size_t Size>
-constexpr std::array<T, Size> adjust_tile_array(const T (&array)[Size], int tile_adj, int palette_num) noexcept
-{
-   GBA_ASSERT(palette_num >= 0 && palette_num < 16);
-   std::array<T, Size> to_ret;
-   for (std::size_t i = 0; i < Size; ++i) {
-      to_ret[i] = (array[i] + tile_adj) | (palette_num << 12);
-   }
-   return to_ret;
-}
 
 constexpr std::uint16_t make_tile(int tile_num, int palette_num) noexcept
 {

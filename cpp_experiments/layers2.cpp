@@ -149,8 +149,8 @@ int main()
    };
 
    const auto map = [&]() {
-      constexpr auto high_priority = gba::adjust_tile_array(test_map_high_priority_tiles, tileset_base, 1);
-      constexpr auto low_priority = gba::adjust_tile_array(test_map_low_priority_tiles, tileset_base, 1);
+      constexpr auto high_priority = adjust_tile_array(std::span{test_map_high_priority_tiles}, tileset_base, 1);
+      constexpr auto low_priority = adjust_tile_array(std::span{test_map_low_priority_tiles}, tileset_base, 1);
       int camera_target_x = -screen_width / 2;
       int camera_target_y = -screen_height / 2 + test_map.y_offset * 8;
       int camera_x = camera_target_x;

@@ -37,9 +37,12 @@ with open(output_file, 'w') as f:
       f'#ifndef {header_guard}_MAP_DATA\n'
       f'#define {header_guard}_MAP_DATA\n'
       f'#include "map_data.hpp"\n'
+      f'#include <array>\n'
       f'#include <cstdint>\n'
-      f'inline constexpr std::uint16_t {name}_high_priority_tiles[]{to_cpp_array(high_priority_tiles)}\n'
-      f'inline constexpr std::uint16_t {name}_low_priority_tiles[]{to_cpp_array(low_priority_tiles)}\n'
+      # TODO: The 2400 is hardcoded because we need std::array
+      #       There's probably a better way to do this
+      f'inline constexpr std::array<std::uint16_t, 2400> {name}_high_priority_tiles{to_cpp_array(high_priority_tiles)}\n'
+      f'inline constexpr std::array<std::uint16_t, 2400> {name}_low_priority_tiles{to_cpp_array(low_priority_tiles)}\n'
       f'inline constexpr std::uint8_t {name}_walkable_map[]{to_cpp_array(walkable)}\n'
       f'inline constexpr std::uint8_t {name}_height_map[]{to_cpp_array(heights)}\n'
       f'inline constexpr bool {name}_sprite_high_priority[]{to_cpp_array(sprite_priority)}\n'
