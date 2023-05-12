@@ -89,28 +89,4 @@ struct character {
    }
 };
 
-inline constexpr base_stats default_snake_base_stats{
-   .hp = 10,
-   .mp = 5,
-   .attack = 10,
-   .defense = 5,
-   .m_attack = 10,
-   .m_defense = 5,
-   .speed = 5,
-   .hit = 10,
-   .move = 5,
-   .jump = 5};
-
-inline constexpr base_stats default_snake_minion_stats{
-   .hp = 7,
-   .mp = 3,
-   .attack = 7,
-   .defense = 4,
-   .m_attack = 7,
-   .m_defense = 4,
-   .speed = 4,
-   .hit = 7,
-   .move = 4,
-   .jump = 3};
-
 #endif // DATA_HPP

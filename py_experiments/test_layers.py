@@ -11,8 +11,8 @@ def main():
    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
    pygame.init()
-   SCREEN_WIDTH = 240
-   SCREEN_HEIGHT = 160
+   SCREEN_WIDTH = 240 * 2
+   SCREEN_HEIGHT = 160 * 2
    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
 
    tileset = pygame.image.load('../assets/test_tileset.png')
@@ -42,7 +42,7 @@ def main():
          [True,  False, False, False, False],
          [True,  True,  True,  False, False],
          [True,  True,  True,  False, False],
-         [True,  True, False, False, False],
+         [True,  True,  False, False, False],
          [False, False, False, False, False]
       ]
 
@@ -50,7 +50,7 @@ def main():
          [True,  False, False, False, False],
          [True,  True,  True,  False, False],
          [True,  True,  True,  False, False],
-         [True,  True, False, False, False],
+         [True,  True,  False, False, False],
          [False, False, False, False, False]
       ]
 
@@ -216,9 +216,10 @@ def main():
       if snake_priority == 1:
          draw_snake()
 
-      screen.blit(my_font.render(f'{sprite_priority[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 0))
-      screen.blit(my_font.render(f'{cursor_x}, {cursor_y}', False, (0, 0, 0)), (0, 12))
-      screen.blit(my_font.render(f'camera: {camera_x}, {camera_y}', False, (0, 0, 0)), (0, 24))
+      screen.blit(my_font.render(f'S:{sprite_priority[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 0))
+      screen.blit(my_font.render(f'T:{tile_priority[cursor_y][cursor_x]}', False, (0, 0, 0)), (0, 12))
+      screen.blit(my_font.render(f'{cursor_x}, {cursor_y}', False, (0, 0, 0)), (0, 24))
+      screen.blit(my_font.render(f'camera: {camera_x}, {camera_y}', False, (0, 0, 0)), (0, 36))
 
       pygame.display.flip()
       pygame.time.wait(50)

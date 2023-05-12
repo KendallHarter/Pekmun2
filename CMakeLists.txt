@@ -62,9 +62,7 @@ if (NOT ${cv2_installed} EQUAL 0)
 endif()
 
 # Create a generated folder to put generated files
-execute_process(
-   COMMAND "${CMAKE_COMMAND}" -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/generated
-)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 macro(create_image_func func_name script_name)
    function(${func_name} input_file output_name)
@@ -97,6 +95,20 @@ function(process_map input_map output_name)
          "${output_name}"
       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/maps/${input_map}/info.json"
       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/maps/${input_map}/tiles.json"
+   )
+
+   add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
+endfunction()
+
+function(process_image_directory input_dir output_name)
+   file(GLOB image_files CONFIGURE_DEPENDS "${input_dir}/*.png")
+   add_custom_command(
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
+      COMMAND Python3::Interpreter
+         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/process_image_directory.py"
+         "${CMAKE_CURRENT_SOURCE_DIR}/assets/${input_dir}"
+         "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"
+      DEPENDS ${image_files}
    )
 
    add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
@@ -148,7 +160,10 @@ process_bitmap_image(win.png win_screen)
 process_map(test_map test_map)
 process_map(test_layers test_layers)
 
-add_dependencies(pekmun2 font title test_tileset file_select stats_screen naming_screen snake win_screen test_layers)
+process_image_directory(pal1 pal1)
+
+add_dependencies(pekmun2
+   font title test_tileset file_select stats_screen naming_screen win_screen test_map test_layers pal1)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)

@@ -3,6 +3,7 @@
 #include "generated/file_select.hpp"
 #include "generated/font.hpp"
 #include "generated/naming_screen.hpp"
+#include "generated/pal1.hpp"
 #include "generated/stats_screen.hpp"
 #include "generated/test_tileset.hpp"
 #include "generated/title.hpp"
@@ -107,6 +108,7 @@ void common_tile_and_palette_setup()
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::bg_palette_addr(0));
    gba::dma3_copy(std::begin(test_tileset_pal), std::end(test_tileset_pal), gba::bg_palette_addr(1));
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::obj_palette_addr(0));
+   gba::dma3_copy(std::begin(pal1::palette), std::end(pal1::palette), gba::obj_palette_addr(1));
 }
 
 void victory_screen() noexcept
@@ -746,13 +748,12 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
          char_obj.set_attr0(
             gba::obj_attr0_options{}.set(display::enable).set(mode::normal).set(mosaic::disable).set(shape::vertical));
          char_obj.set_attr1(gba::obj_attr1_options{}.set(size::h32x16).set(vflip::disable).set(hflip::disable));
-         char_obj.set_tile_and_attr2(0, gba::obj_attr2_options{}.set(palette_num::p1).set(priority::p0));
+         char_obj.set_tile_and_attr2(
+            0, gba::obj_attr2_options{}.set(palette_num{class_palettes[char_.class_]}).set(priority::p0));
          char_obj.set_x(27 * 8);
          char_obj.set_y(1 * 8);
 
-         // TODO: Replace these with dynamic stuff
-         gba::dma3_copy(std::begin(snake), std::end(snake), gba::base_obj_tile_addr(0));
-         gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), gba::obj_palette_addr(1));
+         gba::dma3_copy(class_sprites[char_.class_], class_sprites[char_.class_] + 64, gba::base_obj_tile_addr(0));
       }
    };
 
@@ -800,6 +801,8 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
 // Returns true if the map is beaten, false otherwise
 bool do_map(const full_map_info& map_info) noexcept
 {
+   disable_all_sprites();
+
    constexpr auto screen_width = 240;
    constexpr auto screen_height = 160;
 
@@ -829,7 +832,7 @@ bool do_map(const full_map_info& map_info) noexcept
 
    const auto set_camera = [&](int x, int y) {
       camera_x = -screen_width / 2 + x * 16 + y * 16;
-      camera_y = -screen_height / 2 + y * 8 - x * 8 - map_info.map->height_at(x, y) + map_info.map->y_offset * 8;
+      camera_y = -screen_height / 2 + y * 8 - x * 8 - map_info.map->height_at(x, y) * 8 + map_info.map->y_offset * 8;
    };
 
    set_camera(map_info.base_x, map_info.base_y);
@@ -965,6 +968,8 @@ bool do_map(const full_map_info& map_info) noexcept
       }
    };
 
+   int cursor_x = map_info.base_x;
+   int cursor_y = map_info.base_y;
    init_screen();
    while (true) {
       while (gba::in_vblank()) {}
@@ -972,34 +977,42 @@ bool do_map(const full_map_info& map_info) noexcept
 
       update_keypad_and_frame_counter();
 
-      int delta_x = 0;
-      if (keypad.left_held()) {
-         delta_x = -10;
-      }
-      else if (keypad.right_held()) {
-         delta_x = 10;
-      }
-      int delta_y = 0;
-      if (keypad.up_held()) {
-         delta_y = -10;
-      }
-      else if (keypad.down_held()) {
-         delta_y = 10;
-      }
-
       if (keypad.start_pressed()) {
          gba::bg0.set_scroll(0, 0);
          return true;
       }
+      if (keypad.soft_reset_buttons_held()) {
+         gba::soft_reset();
+      }
 
-      camera_x += delta_x;
-      camera_y += delta_y;
+      if (keypad.left_repeat()) {
+         cursor_x -= 1;
+      }
+      else if (keypad.right_repeat()) {
+         cursor_x += 1;
+      }
+      if (keypad.up_repeat()) {
+         cursor_y -= 1;
+      }
+      else if (keypad.down_repeat()) {
+         cursor_y += 1;
+      }
+
+      cursor_x = std::clamp(cursor_x, 0, map_info.map->width - 1);
+      cursor_y = std::clamp(cursor_y, 0, map_info.map->height - 1);
+
+      const auto old_cx = camera_x;
+      const auto old_cy = camera_y;
+
+      set_camera(cursor_x, cursor_y);
 
       gba::bg0.set_scroll(camera_x, camera_y);
       gba::bg1.set_scroll(camera_x, camera_y);
       gba::bg2.set_scroll(camera_x, camera_y);
       gba::bg3.set_scroll(camera_x, camera_y);
 
+      const auto delta_x = camera_x - old_cx;
+      const auto delta_y = camera_y - old_cy;
       scroll_layer(map_info.map->high_priority_tiles.data(), bg0_screen_block, delta_x, delta_y);
       scroll_layer(map_info.map->low_priority_tiles.data(), bg1_screen_block, delta_x, delta_y);
    }
@@ -1118,7 +1131,7 @@ void main_game_loop() noexcept
             // Find the snake and copy the level to the file data
             const auto snake_it
                = std::find_if(save_data.characters.begin(), save_data.characters.end(), [](const auto& c) {
-                    return c.class_ == class_ids::snake_;
+                    return c.class_ == class_ids::snake;
                  });
             save_data.file_level = snake_it->level;
             global_data.last_file_select = loc;
@@ -1145,16 +1158,16 @@ int main()
          // Set-up initial stats/characters
          save_data.frame_count = 0;
          auto& snake = save_data.characters[0];
-         snake.bases = default_snake_base_stats;
+         snake.bases = class_base_stats[class_ids::snake];
          snake.level = 1;
          snake.calc_stats(false);
          snake.fully_heal();
-         snake.class_ = class_ids::snake_;
+         snake.class_ = class_ids::snake;
          snake.name = do_naming_screen("Name a snake!", 13);
          snake.exists = true;
          for (int i = 1; i != 3; ++i) {
             auto& minion = save_data.characters[i];
-            minion.bases = default_snake_minion_stats;
+            minion.bases = class_base_stats[class_ids::snake_minion];
             minion.level = 1;
             minion.calc_stats(false);
             minion.fully_heal();

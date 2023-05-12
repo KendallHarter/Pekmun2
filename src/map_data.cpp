@@ -26,7 +26,10 @@ constexpr std::array<std::array<const char*, 9>, num_chapters> map_names{
 constexpr std::array<std::array<map_data, 9>, num_chapters> map_data_array{
    {{test_map.rebase_map(start_map_tileset, map_palette), test_layers.rebase_map(start_map_tileset, map_palette)}}};
 
-constexpr std::array<std::array<std::array<enemy_base, max_enemies>, 9>, 7> map_enemies{
+constexpr std::array<std::array<std::pair<std::uint8_t, std::uint8_t>, 9>, num_chapters> base_locs{
+   {{{{0, 6}, {13, 0}}}}};
+
+constexpr std::array<std::array<std::array<enemy_base, max_enemies>, 9>, num_chapters> map_enemies{
    {{{1, evil_snake, 5, 5, false}}}};
 
 std::span<const char* const> get_map_names(int chapter, const file_save_data& data) noexcept
@@ -40,5 +43,6 @@ std::span<const char* const> get_map_names(int chapter, const file_save_data& da
 
 full_map_info get_map_data_and_enemies(int chapter, int map) noexcept
 {
-   return full_map_info{0, 0, &map_data_array[chapter][map], std::span{map_enemies[chapter][map]}};
+   const auto loc = base_locs[chapter][map];
+   return full_map_info{loc.first, loc.second, &map_data_array[chapter][map], std::span{map_enemies[chapter][map]}};
 }
