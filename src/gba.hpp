@@ -994,7 +994,7 @@ constexpr int num_tiles(const std::uint32_t (&)[Size]) noexcept
 
 constexpr std::uint16_t make_gba_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept
 {
-   const auto conv = [](std::uint8_t val) {
+   constexpr auto conv = [](std::uint8_t val) {
       // std::round isn't constexpr until C++23 so have to manually round
       constexpr auto low_val = 0;
       const auto temp_val = (31 - low_val) * val / 255.0;

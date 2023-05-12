@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <limits>
 #include <span>
 #include <utility>
@@ -48,7 +49,7 @@ enum struct title_selection {
 
 gba::keypad_status keypad;
 global_save_data global_data;
-file_save_data save_data;
+[[gnu::section(".ewram")]] file_save_data save_data;
 [[gnu::section(".ewram")]] file_save_data backup_data;
 
 void update_keypad_and_frame_counter() noexcept
@@ -717,7 +718,7 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
       gba::dma3_fill(start_fill, start_fill + 32 * 32, ' ');
       gba::copy_tilemap(stats_screen, gba::bg_opt::screen_base_block::b62);
       write_bg0(char_.name.data(), 1, 1);
-      write_bg0(class_names[char_.class_], 1, 3);
+      write_bg0(class_data[char_.class_].name, 1, 3);
       disp_core_stat(char_.attack, 1, 8);
       disp_core_stat(char_.defense, 1, 10);
       disp_core_stat(char_.m_attack, 1, 12);
@@ -749,11 +750,14 @@ int display_stats(std::span<character> char_list, int index, bool allow_equippin
             gba::obj_attr0_options{}.set(display::enable).set(mode::normal).set(mosaic::disable).set(shape::vertical));
          char_obj.set_attr1(gba::obj_attr1_options{}.set(size::h32x16).set(vflip::disable).set(hflip::disable));
          char_obj.set_tile_and_attr2(
-            0, gba::obj_attr2_options{}.set(palette_num{class_palettes[char_.class_]}).set(priority::p0));
+            0, gba::obj_attr2_options{}.set(palette_num{class_data[char_.class_].palette}).set(priority::p0));
          char_obj.set_x(27 * 8);
          char_obj.set_y(1 * 8);
 
-         gba::dma3_copy(class_sprites[char_.class_], class_sprites[char_.class_] + 64, gba::base_obj_tile_addr(0));
+         gba::dma3_copy(
+            std::begin(class_data[char_.class_].sprite),
+            std::end(class_data[char_.class_].sprite),
+            gba::base_obj_tile_addr(0));
       }
    };
 
@@ -971,6 +975,17 @@ bool do_map(const full_map_info& map_info) noexcept
    int cursor_x = map_info.base_x;
    int cursor_y = map_info.base_y;
    init_screen();
+   // Set-up cursor sprite
+   gba::dma3_copy(std::begin(pal1::cursor), std::end(pal1::cursor), gba::base_obj_tile_addr(0));
+   {
+      using namespace gba::obj_opt;
+      gba::obj{0}.set_attr0(
+         gba::obj_attr0_options{}.set(display::enable).set(mode::normal).set(mosaic::disable).set(shape::square));
+      gba::obj{0}.set_attr1(gba::obj_attr1_options{}.set(size::s32x32).set(vflip::disable).set(hflip::disable));
+      gba::obj{0}.set_tile_and_attr2(0, gba::obj_attr2_options{}.set(palette_num{1}).set(priority::p0));
+      gba::obj{0}.set_loc(screen_width / 2, screen_height / 2 - 16 - 1);
+   }
+
    while (true) {
       while (gba::in_vblank()) {}
       while (!gba::in_vblank()) {}
@@ -1000,6 +1015,13 @@ bool do_map(const full_map_info& map_info) noexcept
 
       cursor_x = std::clamp(cursor_x, 0, map_info.map->width - 1);
       cursor_y = std::clamp(cursor_y, 0, map_info.map->height - 1);
+
+      if (map_info.map->sprite_is_high_priority_at(cursor_x, cursor_y)) {
+         gba::obj{0}.set_attr2(gba::obj_attr2_options{}.set(gba::obj_opt::priority::p2));
+      }
+      else {
+         gba::obj{0}.set_attr2(gba::obj_attr2_options{}.set(gba::obj_opt::priority::p3));
+      }
 
       const auto old_cx = camera_x;
       const auto old_cy = camera_y;
@@ -1158,7 +1180,7 @@ int main()
          // Set-up initial stats/characters
          save_data.frame_count = 0;
          auto& snake = save_data.characters[0];
-         snake.bases = class_base_stats[class_ids::snake];
+         snake.bases = class_data[class_ids::snake].stats;
          snake.level = 1;
          snake.calc_stats(false);
          snake.fully_heal();
@@ -1167,7 +1189,7 @@ int main()
          snake.exists = true;
          for (int i = 1; i != 3; ++i) {
             auto& minion = save_data.characters[i];
-            minion.bases = class_base_stats[class_ids::snake_minion];
+            minion.bases = class_data[class_ids::snake_minion].stats;
             minion.level = 1;
             minion.calc_stats(false);
             minion.fully_heal();

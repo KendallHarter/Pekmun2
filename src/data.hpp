@@ -89,4 +89,9 @@ struct character {
    }
 };
 
+struct combatant : public character {
+   std::uint8_t x;
+   std::uint8_t y;
+};
+
 #endif // DATA_HPP

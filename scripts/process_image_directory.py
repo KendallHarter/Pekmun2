@@ -55,7 +55,7 @@ for image in glob.glob(f'{input_dir}/*.png'):
                      add_value = True
                      prev_value = index
                except:
-                  sys.exit(f'Color {(r, g, b)} at {(x, y)} in {image} not found in palette')
+                  sys.exit(f'Color {(r, g, b)} at {(base_x * 8 + x, base_y * 8 + y)} in {image} not found in palette')
 
    # Compact into 32-bit integers
    for a, b, c, d in zip(*([iter(raw_vals)] * 4)):

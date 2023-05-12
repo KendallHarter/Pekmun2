@@ -14,45 +14,52 @@ enum class_ids : std::uint8_t {
    evil_snake
 };
 
-inline constexpr auto class_names = std::to_array<const char*>({"Snake", "Snake minion"});
+struct class_info {
+   std::uint8_t palette;
+   const char* name;
+   const std::uint32_t (&sprite)[64];
+   base_stats stats;
+};
 
-inline constexpr auto class_sprites = std::to_array({pal1::snake, pal1::snake_minion, pal1::evil_snake});
-
-inline constexpr auto class_palettes = std::to_array({1, 1, 1});
-
-inline constexpr auto class_base_stats = std::to_array(
-   {base_stats{
-       .hp = 10,
-       .mp = 5,
-       .attack = 10,
-       .defense = 5,
-       .m_attack = 10,
-       .m_defense = 5,
-       .speed = 5,
-       .hit = 10,
-       .move = 5,
-       .jump = 5},
-    base_stats{
-       .hp = 7,
-       .mp = 3,
-       .attack = 7,
-       .defense = 4,
-       .m_attack = 7,
-       .m_defense = 4,
-       .speed = 4,
-       .hit = 7,
-       .move = 4,
-       .jump = 3},
-    base_stats{
-       .hp = 7,
-       .mp = 3,
-       .attack = 8,
-       .defense = 4,
-       .m_attack = 8,
-       .m_defense = 4,
-       .speed = 3,
-       .hit = 3,
-       .move = 4,
-       .jump = 3}});
+inline constexpr class_info class_data[]{
+   {1,
+    "Snake",
+    pal1::snake,
+    {.hp = 10,
+     .mp = 5,
+     .attack = 10,
+     .defense = 5,
+     .m_attack = 10,
+     .m_defense = 5,
+     .speed = 5,
+     .hit = 10,
+     .move = 5,
+     .jump = 5}},
+   {1,
+    "Snake minion",
+    pal1::snake_minion,
+    {.hp = 7,
+     .mp = 3,
+     .attack = 7,
+     .defense = 4,
+     .m_attack = 7,
+     .m_defense = 4,
+     .speed = 4,
+     .hit = 7,
+     .move = 4,
+     .jump = 3}},
+   {1,
+    "Evil snake",
+    pal1::evil_snake,
+    {.hp = 7,
+     .mp = 3,
+     .attack = 8,
+     .defense = 4,
+     .m_attack = 8,
+     .m_defense = 4,
+     .speed = 3,
+     .hit = 3,
+     .move = 4,
+     .jump = 3}}};
 
 #endif // CLASSES_HPP
