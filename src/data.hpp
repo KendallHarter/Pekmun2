@@ -36,6 +36,7 @@ struct base_stats {
 
 struct character {
    bool exists = false;
+   bool deployed = false;
    std::uint8_t class_;
    base_stats bases;
    std::array<char, 16> name;
@@ -89,11 +90,15 @@ struct character {
    }
 };
 
-struct combatant : public character {
+struct combatant {
    std::int8_t x;
    std::int8_t y;
-   bool present = false;
+   std::int8_t start_x;
+   std::int8_t start_y;
+   std::int8_t index;
+   bool moved = false;
    int tile_no;
+   character* stats;
 };
 
 #endif // DATA_HPP

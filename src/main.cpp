@@ -537,18 +537,20 @@ void draw_menu(std::span<const char* const> options, int x, int y, int blank_arr
    }
    {
       using namespace gba::lcd_opt;
-      gba::lcd.set_options(gba::lcd_options{}
-                              .set(bg_mode::mode_0)
-                              .set(forced_blank::off)
-                              .set(display_bg0::on)
-                              .set(display_bg1::off)
-                              .set(display_bg2::off)
-                              .set(display_bg3::off)
-                              .set(display_obj::off)
-                              .set(display_window_0::off)
-                              .set(display_window_1::off)
-                              .set(display_window_obj::off)
-                              .set(obj_char_mapping::one_dimensional));
+      gba::lcd.set_options(
+         gba::preserve,
+         gba::lcd_options{}
+            .set(bg_mode::mode_0)
+            .set(forced_blank::off)
+            .set(display_bg0::on)
+            // .set(display_bg1::off)
+            // .set(display_bg2::off)
+            // .set(display_bg3::off)
+            // .set(display_obj::off)
+            .set(display_window_0::off)
+            .set(display_window_1::off)
+            .set(display_window_obj::off)
+            .set(obj_char_mapping::one_dimensional));
    }
 
    draw_box(gba::bg_opt::screen_base_block::b62, x, y, max_len + 3, options.size() + 2);
@@ -793,20 +795,23 @@ bool do_map(const full_map_info& map_info) noexcept
    // load all the enemies
    constexpr auto start_tile_offset = 24;
    static_vector<combatant, max_enemies> enemies;
+   static_vector<character, max_enemies> enemy_stats;
+   static_vector<combatant, max_player_units_on_map> player_units;
    for (int i = 0; i < std::ssize(map_info.base_enemies); ++i) {
       const auto& enemy = map_info.base_enemies[i];
       if (enemy.level > 0) {
          enemies.push_back({});
+         enemy_stats.push_back({});
          auto& new_enemy = enemies.back();
-         new_enemy.level = enemy.level;
+         auto& new_stats = enemy_stats.back();
+         new_stats.level = enemy.level;
          new_enemy.x = enemy.x;
          new_enemy.y = enemy.y;
-         new_enemy.class_ = enemy.class_;
-         new_enemy.bases = class_data[enemy.class_].stats;
-         new_enemy.present = true;
-         new_enemy.calc_stats(true);
-         new_enemy.fully_heal();
-         // TODO: Copy tile data
+         new_enemy.stats = &new_stats;
+         new_stats.class_ = enemy.class_;
+         new_stats.bases = class_data[enemy.class_].stats;
+         new_stats.calc_stats(true);
+         new_stats.fully_heal();
          const auto tile_offset = start_tile_offset + i * 8;
          new_enemy.tile_no = tile_offset;
          const auto& tile_data = class_data[enemy.class_].sprite;
@@ -954,8 +959,8 @@ bool do_map(const full_map_info& map_info) noexcept
       gba::dma3_fill(bg2_tiles, bg2_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
       gba::dma3_fill(bg3_tiles, bg3_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
 
-      redraw_layer(map_info.map->high_priority_tiles.data(), bg0_screen_block);
-      redraw_layer(map_info.map->low_priority_tiles.data(), bg1_screen_block);
+      redraw_layer(map_info.map->high_priority_tiles.data(), bg2_screen_block);
+      redraw_layer(map_info.map->low_priority_tiles.data(), bg3_screen_block);
 
       gba::bg0.set_scroll(camera_x, camera_y);
       gba::bg1.set_scroll(camera_x, camera_y);
@@ -980,11 +985,12 @@ bool do_map(const full_map_info& map_info) noexcept
    };
 
    combatant cursor;
+   character cursor_char;
    cursor.x = map_info.base_x;
    cursor.y = map_info.base_y;
-   cursor.present = true;
    cursor.tile_no = 0;
-   cursor.class_ = cursor_class;
+   cursor.stats = &cursor_char;
+   cursor_char.class_ = cursor_class;
    init_screen();
 
    const auto display_sprite = [&](int x, int y, int obj_num, int x_adj, int y_adj) {
@@ -1020,11 +1026,16 @@ bool do_map(const full_map_info& map_info) noexcept
       display_sprite(map_info.base_x, map_info.base_y, 127, 0, 0);
    }
 
+   std::array<bool, 8> used_tiles;
+   std::fill(used_tiles.begin(), used_tiles.end(), false);
    while (true) {
       static_vector<const combatant*, max_enemies + max_player_units_on_map + 1> combatant_pointers;
       combatant_pointers.push_back(&cursor);
       for (const auto& enemy : enemies) {
          combatant_pointers.push_back(&enemy);
+      }
+      for (const auto& unit : player_units) {
+         combatant_pointers.push_back(&unit);
       }
 
       wait_vblank_and_update();
@@ -1046,6 +1057,58 @@ bool do_map(const full_map_info& map_info) noexcept
          cursor.y += 1;
       }
 
+      if (keypad.a_pressed()) {
+         const auto player_unit_menu = [&](const auto& unit) {
+
+         };
+         const auto matches_cursor_loc = [&](const auto& obj) { return cursor.x == obj.x && cursor.y == obj.y; };
+         const auto enemy_iter = std::find_if(enemies.begin(), enemies.end(), matches_cursor_loc);
+         const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
+         if (enemy_iter != enemies.end()) {
+            ;
+         }
+         else if (player_iter != player_units.end()) {
+            ;
+         }
+         else if (cursor.x == map_info.base_x && cursor.y == map_info.base_y) {
+            static_vector<const char*, max_characters> char_names;
+            static_vector<character*, max_characters> char_mapping;
+            for (auto& char_ : save_data.characters) {
+               if (char_.exists && !char_.deployed) {
+                  char_names.push_back(char_.name.data());
+                  char_mapping.push_back(&char_);
+               }
+            }
+            if (char_names.size() > 0) {
+               if (player_units.size() != max_player_units_on_map) {
+                  gba::bg0.set_scroll(0, 0);
+                  const auto choice = menu(char_names, 0, 0, 0, true);
+                  if (choice != -1) {
+                     player_units.push_back({});
+                     auto& new_unit = player_units.back();
+                     new_unit.x = map_info.base_x;
+                     new_unit.y = map_info.base_y;
+                     new_unit.start_x = map_info.base_x;
+                     new_unit.start_y = map_info.base_y;
+                     new_unit.stats = char_mapping[choice];
+                     char_mapping[choice]->deployed = true;
+                     const auto index_loc = std::find(used_tiles.begin(), used_tiles.end(), false);
+                     *index_loc = true;
+                     const auto index = std::distance(used_tiles.begin(), index_loc);
+                     new_unit.index = index;
+                     const auto& tile_data = class_data[char_mapping[choice]->class_].sprite;
+                     const auto tile_no = start_tile_offset + max_enemies * 8;
+                     const auto write_loc = gba::base_obj_tile_addr(0) + tile_no * 8;
+                     new_unit.tile_no = tile_no;
+                     gba::dma3_copy(std::begin(tile_data), std::end(tile_data), write_loc);
+                  }
+                  // clear out bg0 after the menu
+                  gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+               }
+            }
+         }
+      }
+
       const auto i8 = [](auto val) { return static_cast<std::int8_t>(val); };
       cursor.x = std::clamp(cursor.x, i8(0), i8(map_info.map->width - 1));
       cursor.y = std::clamp(cursor.y, i8(0), i8(map_info.map->height - 1));
@@ -1062,7 +1125,7 @@ bool do_map(const full_map_info& map_info) noexcept
          if (lhs->y == rhs->y) {
             if (lhs->x == rhs->x) {
                // this only happens for the cursor, which we always want to be lower priority
-               return lhs->class_ > rhs->class_;
+               return lhs->stats->class_ > rhs->stats->class_;
             }
             return lhs->x < rhs->x;
          }
@@ -1073,31 +1136,23 @@ bool do_map(const full_map_info& map_info) noexcept
       for (int i = 0; i < std::ssize(combatant_pointers); ++i) {
          const auto combatant_obj = gba::obj{3 * i};
          const auto& cur_combatant = *combatant_pointers[i];
-         if (cur_combatant.present) {
-            using namespace gba::obj_opt;
-            const auto palette_no = class_data[cur_combatant.class_].palette;
-            combatant_obj.set_tile_and_attr2(
-               cur_combatant.tile_no, gba::obj_attr2_options{}.set(palette_num{palette_no}));
-            if (cur_combatant.class_ == cursor_class) {
-               combatant_obj.set_attr0(gba::obj_attr0_options{}
-                                          .set(display::enable)
-                                          .set(mode::normal)
-                                          .set(mosaic::disable)
-                                          .set(shape::square));
-               combatant_obj.set_attr1(
-                  gba::obj_attr1_options{}.set(size::s32x32).set(vflip::disable).set(hflip::disable));
-               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 0, -17);
-            }
-            else {
-               combatant_obj.set_attr0(gba::obj_attr0_options{}
-                                          .set(display::enable)
-                                          .set(mode::normal)
-                                          .set(mosaic::disable)
-                                          .set(shape::vertical));
-               combatant_obj.set_attr1(
-                  gba::obj_attr1_options{}.set(size::v16x32).set(vflip::disable).set(hflip::disable));
-               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 8, -24);
-            }
+         using namespace gba::obj_opt;
+         const auto palette_no = class_data[cur_combatant.stats->class_].palette;
+         combatant_obj.set_tile_and_attr2(cur_combatant.tile_no, gba::obj_attr2_options{}.set(palette_num{palette_no}));
+         if (cur_combatant.stats->class_ == cursor_class) {
+            combatant_obj.set_attr0(
+               gba::obj_attr0_options{}.set(display::enable).set(mode::normal).set(mosaic::disable).set(shape::square));
+            combatant_obj.set_attr1(gba::obj_attr1_options{}.set(size::s32x32).set(vflip::disable).set(hflip::disable));
+            display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 0, -17);
+         }
+         else {
+            combatant_obj.set_attr0(gba::obj_attr0_options{}
+                                       .set(display::enable)
+                                       .set(mode::normal)
+                                       .set(mosaic::disable)
+                                       .set(shape::vertical));
+            combatant_obj.set_attr1(gba::obj_attr1_options{}.set(size::v16x32).set(vflip::disable).set(hflip::disable));
+            display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 8, -24);
          }
       }
 
@@ -1108,13 +1163,14 @@ bool do_map(const full_map_info& map_info) noexcept
 
       const auto delta_x = camera_x - old_cx;
       const auto delta_y = camera_y - old_cy;
-      scroll_layer(map_info.map->high_priority_tiles.data(), bg0_screen_block, delta_x, delta_y);
-      scroll_layer(map_info.map->low_priority_tiles.data(), bg1_screen_block, delta_x, delta_y);
+      scroll_layer(map_info.map->high_priority_tiles.data(), bg2_screen_block, delta_x, delta_y);
+      scroll_layer(map_info.map->low_priority_tiles.data(), bg3_screen_block, delta_x, delta_y);
    }
 }
 
 void main_game_loop() noexcept
 {
+   disable_all_sprites();
    gba::bg0.set_scroll(0, 0);
    int opt = 0;
    while (true) {
@@ -1192,6 +1248,7 @@ void main_game_loop() noexcept
             choice = menu(get_character_names(), 11, 0, choice, true);
             if (choice != -1) {
                display_stats(save_data.characters, choice, true);
+               disable_all_sprites();
             }
          }
       } break;
@@ -1220,7 +1277,10 @@ void main_game_loop() noexcept
       // New char
       case 4: break;
       // Load
-      case 5: load_game(); break;
+      case 5:
+         load_game();
+         disable_all_sprites();
+         break;
       // Save
       case 6: {
          const auto loc = select_file_data("to save to.", false);
@@ -1235,6 +1295,7 @@ void main_game_loop() noexcept
             write_global_save_data(global_data);
             sram_write(save_data, file_save_loc(loc));
          }
+         disable_all_sprites();
       } break;
       }
    }

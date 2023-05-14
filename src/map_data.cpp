@@ -42,7 +42,15 @@ constexpr std::array<std::array<enemy_base, max_enemies>, maps_per_chapter * num
    {// Chapter 1
     {{{1, evil_snake, 6, 5, false}, {1, evil_snake, 6, 6, false}, {1, evil_snake, 6, 7, false}}},
     {{{2, evil_snake, 5, 5, false}}},
-    {{{3, evil_snake, 5, 5, false}}}}};
+    {{{3, evil_snake, 5, 5, false}}},
+    {{}},
+    {{}},
+    {{}},
+    {{}},
+    {{}},
+    {{}},
+    // Chapter 2
+    {{}}}};
 
 std::span<const char* const> get_map_names(int chapter, const file_save_data& data) noexcept
 {
