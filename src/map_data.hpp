@@ -14,6 +14,8 @@ inline constexpr auto map_data_max_width = 16;
 inline constexpr auto tilemap_width = 60;
 inline constexpr auto tilemap_height = 40;
 inline constexpr auto num_chapters = 2;
+inline constexpr auto max_enemies = 12;
+inline constexpr auto max_player_units_on_map = 8;
 
 // This is a common enough operation to have a function for it
 template<typename T, std::size_t Size>
@@ -70,14 +72,14 @@ struct map_data {
 struct enemy_base {
    std::int32_t level;
    std::uint8_t class_;
-   std::uint8_t x;
-   std::uint8_t y;
+   std::int8_t x;
+   std::int8_t y;
    bool is_boss;
 };
 
 struct full_map_info {
-   std::uint8_t base_x;
-   std::uint8_t base_y;
+   std::int8_t base_x;
+   std::int8_t base_y;
    const map_data* map;
    std::span<const enemy_base> base_enemies;
 };

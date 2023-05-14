@@ -101,6 +101,8 @@ function(process_map input_map output_name)
 endfunction()
 
 function(process_image_directory input_dir output_name)
+   # This doesn't actually seem to work, unfortunately
+   # I don't know how to make it work, if it's even possible
    file(GLOB image_files CONFIGURE_DEPENDS "${input_dir}/*.png")
    add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp"

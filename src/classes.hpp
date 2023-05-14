@@ -9,6 +9,8 @@
 
 // TODO: There's probably a better way of doing this?
 enum class_ids : std::uint8_t {
+   // dummy class used for placing the cursor
+   cursor_class,
    snake,
    snake_minion,
    evil_snake
@@ -22,6 +24,7 @@ struct class_info {
 };
 
 inline constexpr class_info class_data[]{
+   {1, "", pal1::snake, {}},
    {1,
     "Snake",
     pal1::snake,

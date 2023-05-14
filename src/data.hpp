@@ -90,8 +90,10 @@ struct character {
 };
 
 struct combatant : public character {
-   std::uint8_t x;
-   std::uint8_t y;
+   std::int8_t x;
+   std::int8_t y;
+   bool present = false;
+   int tile_no;
 };
 
 #endif // DATA_HPP
