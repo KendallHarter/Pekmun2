@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <random>
 
+constexpr int max_move = 15;
+
 struct item {
    bool exists = false;
    std::uint8_t item_name;
@@ -30,8 +32,8 @@ struct base_stats {
    std::uint8_t m_defense;
    std::uint8_t speed;
    std::uint8_t hit;
-   std::uint8_t move;
-   std::uint8_t jump;
+   std::int8_t move;
+   std::int8_t jump;
 };
 
 struct character {
@@ -97,6 +99,7 @@ struct combatant {
    std::int8_t start_y;
    std::int8_t index;
    bool moved = false;
+   bool acted = false;
    int tile_no;
    character* stats;
 };

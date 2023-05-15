@@ -96,7 +96,9 @@ public:
       // convert from const T* to T*
       const auto start = begin() + (first - cbegin());
       const auto num_erased = last - first;
-      return std::move(start + num_erased, end(), start);
+      const auto old_end = end();
+      num_elements_ -= num_erased;
+      return std::move(start + num_erased, old_end, start);
    }
 
 private:
