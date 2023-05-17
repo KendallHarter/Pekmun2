@@ -167,6 +167,7 @@ process_bitmap_image(win.png win_screen)
 
 process_map(test_map test_map)
 process_map(test_layers test_layers)
+process_map(arena arena)
 
 process_image_directory(obj_pal1 obj_pal1)
 process_image_directory(obj_pal2 obj_pal2)
@@ -183,6 +184,7 @@ add_dependencies(pekmun2
    win_screen
    test_map
    test_layers
+   arena
    obj_pal1
    obj_pal2
    bg_pal2

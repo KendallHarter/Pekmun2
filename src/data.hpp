@@ -79,17 +79,31 @@ struct character {
       }
    }
 
+   void level_up_if_needed() noexcept
+   {
+      const auto start_level = level;
+      while (remaining_exp() <= 0) {
+         exp -= needed_exp();
+         level += 1;
+      }
+      if (start_level != level) {
+         // Only character units get experience so can always not randomize
+         calc_stats(false);
+      }
+   }
+
    void fully_heal() noexcept
    {
       hp = max_hp;
       mp = max_mp;
    }
 
-   std::int32_t remaining_exp() const noexcept
+   std::int32_t needed_exp() const noexcept
    {
-      const auto exp_needed = std::min(50 * static_cast<std::int64_t>(level), static_cast<std::int64_t>(999'999'999));
-      return exp_needed - exp;
+      return std::min(50 * static_cast<std::int64_t>(level), static_cast<std::int64_t>(999'999'999));
    }
+
+   std::int32_t remaining_exp() const noexcept { return needed_exp() - exp; }
 };
 
 inline std::int64_t calc_normal_damage(const character& attacker, const character& defender) noexcept

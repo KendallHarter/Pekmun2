@@ -2,6 +2,7 @@
 
 #include "classes.hpp"
 
+#include "generated/arena.hpp"
 #include "generated/test_layers.hpp"
 #include "generated/test_map.hpp"
 
@@ -30,7 +31,12 @@ constexpr std::array<map_data, maps_per_chapter * num_chapters> map_data_array{
     test_map.rebase_map(start_map_tileset, map_palette),
     test_layers.rebase_map(start_map_tileset, map_palette),
     test_map.rebase_map(start_map_tileset, map_palette),
-    test_layers.rebase_map(start_map_tileset, map_palette)}};
+    test_layers.rebase_map(start_map_tileset, map_palette),
+    {},
+    {},
+    {},
+    {},
+    arena.rebase_map(start_map_tileset, map_palette)}};
 
 constexpr std::array<std::pair<std::int8_t, std::int8_t>, maps_per_chapter * num_chapters> base_locs{{// Chapter 1
                                                                                                       {0, 6},
@@ -41,14 +47,17 @@ constexpr std::array<std::pair<std::int8_t, std::int8_t>, maps_per_chapter * num
 constexpr std::array<std::array<enemy_base, max_enemies>, maps_per_chapter * num_chapters> map_enemies{
    {// Chapter 1
     {{{1, evil_snake, 6, 5, false}, {1, evil_snake, 6, 6, false}, {1, evil_snake, 6, 7, false}}},
-    {{{2, evil_snake, 5, 5, false}}},
-    {{{3, evil_snake, 5, 5, false}}},
+    {{{2, evil_snake, 5, 5, false}, {2, evil_snake, 0, 0, false}, {2, evil_snake, 0, 6, false}}},
+    {{{3, evil_snake, 15, 0, false},
+      {3, evil_snake, 15, 4, false},
+      {3, evil_snake, 15, 8, false},
+      {3, evil_snake, 15, 12, false}}},
     {{}},
     {{}},
     {{}},
     {{}},
     {{}},
-    {{}},
+    {{10, super_snake, 3, 3, true}},
     // Chapter 2
     {{}}}};
 

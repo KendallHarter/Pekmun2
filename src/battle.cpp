@@ -464,16 +464,16 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          }
       }
       if (won) {
-         for (auto& unit : player_units) {
-            unit.stats->deployed = false;
-            unit.stats->fully_heal();
+         for (auto& unit : save_data.characters) {
+            unit.deployed = false;
+            unit.fully_heal();
          }
          return true;
       }
 
       bool lost = true;
       for (const auto& unit : save_data.characters) {
-         if (unit.hp > 0) {
+         if (unit.hp > 0 && unit.exists) {
             lost = false;
             break;
          }
@@ -557,6 +557,10 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                cursor.x = enemy.x;
                cursor.y = enemy.y;
                update_screen();
+               // If there are no enemies don't move
+               if (player_units.empty()) {
+                  continue;
+               }
                move_tiles = find_path(
                   enemy.x, enemy.y, enemy.stats->bases.move, enemy.stats->bases.jump, map_info, player_units);
                // remove any panels that already have an enemy unit on them
@@ -568,6 +572,11 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                   if (iter != move_tiles.end()) {
                      move_tiles.erase(iter);
                   }
+               }
+               // remove the base panel too
+               const auto iter = std::find(move_tiles.begin(), move_tiles.end(), pos{map_info.base_x, map_info.base_y});
+               if (iter != move_tiles.end()) {
+                  move_tiles.erase(iter);
                }
                // try to attack the closest unit to the starting location
                const auto dist = [](int x1, int y1, int x2, int y2) { return std::abs(x2 - x1) + std::abs(y2 - y1); };
@@ -597,7 +606,9 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                if (dist(enemy.x, enemy.y, closest_unit->x, closest_unit->y) == 1) {
                   const auto damage = calc_normal_damage(*enemy.stats, *closest_unit->stats);
                   closest_unit->stats->hp -= damage;
-                  // TODO: Removing units
+                  if (closest_unit->stats->hp <= 0) {
+                     player_units.erase(closest_unit);
+                  }
                }
             }
             for (auto& enemy : enemies) {
@@ -710,6 +721,8 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                const auto damage = calc_normal_damage(*attacking_unit->stats, *enemy_iter->stats);
                enemy_iter->stats->hp -= damage;
                if (enemy_iter->stats->hp <= 0) {
+                  attacking_unit->stats->exp += enemy_iter->stats->level * 30;
+                  attacking_unit->stats->level_up_if_needed();
                   enemies.erase(enemy_iter);
                }
                finish_or_cancel_move();
@@ -722,7 +735,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             static_vector<const char*, max_characters> char_names;
             static_vector<character*, max_characters> char_mapping;
             for (auto& char_ : save_data.characters) {
-               if (char_.exists && !char_.deployed) {
+               if (char_.exists && !char_.deployed && char_.hp > 0) {
                   char_names.push_back(char_.name.data());
                   char_mapping.push_back(&char_);
                }
