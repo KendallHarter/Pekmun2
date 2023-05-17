@@ -13,7 +13,7 @@
 template<typename T, std::size_t MaxElements>
 struct static_vector {
 public:
-   // Constructors/destructors
+   // Constructors/destructors/assignment
 
    static_vector() noexcept : num_elements_{0} {}
 
@@ -26,6 +26,23 @@ public:
    {
       std::move(other.begin(), other.end(), begin());
       other.num_elements_ = 0;
+   }
+
+   static_vector& operator=(const static_vector& other) noexcept
+   {
+      clear();
+      num_elements_ = other.num_elements_;
+      std::copy(other.begin(), other.end(), begin());
+      return *this;
+   }
+
+   static_vector& operator=(static_vector&& other) noexcept
+   {
+      clear();
+      num_elements_ = other.num_elements_;
+      std::move(other.begin(), other.end(), begin());
+      other.num_elements_ = 0;
+      return *this;
    }
 
    ~static_vector() noexcept { clear(); }

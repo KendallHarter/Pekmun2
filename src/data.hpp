@@ -11,8 +11,8 @@ constexpr int max_move = 15;
 struct item {
    bool exists = false;
    std::uint8_t item_name;
-   std::uint8_t move;
-   std::uint8_t jump;
+   std::int8_t move;
+   std::int8_t jump;
    std::int64_t hp;
    std::int64_t mp;
    std::int32_t attack;

@@ -5,7 +5,7 @@
 
 #include "data.hpp"
 
-#include "generated/pal1.hpp"
+#include "generated/obj_pal1.hpp"
 
 // TODO: There's probably a better way of doing this?
 enum class_ids : std::uint8_t {
@@ -24,10 +24,10 @@ struct class_info {
 };
 
 inline constexpr class_info class_data[]{
-   {1, "", pal1::snake, {}},
+   {1, "", obj_pal1::snake, {}},
    {1,
     "Snake",
-    pal1::snake,
+    obj_pal1::snake,
     {.hp = 10,
      .mp = 5,
      .attack = 10,
@@ -40,7 +40,7 @@ inline constexpr class_info class_data[]{
      .jump = 5}},
    {1,
     "Snake minion",
-    pal1::snake_minion,
+    obj_pal1::snake_minion,
     {.hp = 7,
      .mp = 3,
      .attack = 7,
@@ -53,7 +53,7 @@ inline constexpr class_info class_data[]{
      .jump = 3}},
    {1,
     "Evil snake",
-    pal1::evil_snake,
+    obj_pal1::evil_snake,
     {.hp = 7,
      .mp = 3,
      .attack = 8,

@@ -120,7 +120,13 @@ endfunction()
 # Disable ABI change warnings because we don't care about them
 add_compile_options(-Wall -Wextra -Wpedantic -Wno-psabi)
 
-add_executable(pekmun2 src/main.cpp src/map_data.cpp)
+add_executable(pekmun2
+   src/battle.cpp
+   src/common_funcs.cpp
+   src/main.cpp
+   src/map_data.cpp
+   src/pathfinding.cpp
+)
 fix_gba_target(pekmun2)
 
 add_executable(scrolling cpp_experiments/scrolling.cpp)
@@ -162,10 +168,24 @@ process_bitmap_image(win.png win_screen)
 process_map(test_map test_map)
 process_map(test_layers test_layers)
 
-process_image_directory(pal1 pal1)
+process_image_directory(obj_pal1 obj_pal1)
+process_image_directory(obj_pal2 obj_pal2)
+process_image_directory(bg_pal2 bg_pal2)
 
 add_dependencies(pekmun2
-   font title test_tileset file_select stats_screen naming_screen win_screen test_map test_layers pal1)
+   font
+   title
+   test_tileset
+   file_select
+   stats_screen
+   naming_screen
+   win_screen
+   test_map
+   test_layers
+   obj_pal1
+   obj_pal2
+   bg_pal2
+)
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)
