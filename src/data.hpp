@@ -92,6 +92,15 @@ struct character {
    }
 };
 
+inline std::int64_t calc_normal_damage(const character& attacker, const character& defender) noexcept
+{
+   const auto base_damage = attacker.attack * 5 / 3 - defender.defense;
+   if (base_damage < 0) {
+      return 0;
+   }
+   return base_damage;
+}
+
 struct combatant {
    std::int8_t x;
    std::int8_t y;

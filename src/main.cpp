@@ -1,4 +1,5 @@
 #include "generated/bg_pal2.hpp"
+#include "generated/bg_pal3.hpp"
 #include "generated/file_select.hpp"
 #include "generated/font.hpp"
 #include "generated/naming_screen.hpp"
@@ -51,6 +52,7 @@ void common_tile_and_palette_setup()
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::bg_palette_addr(0));
    gba::dma3_copy(std::begin(test_tileset_pal), std::end(test_tileset_pal), gba::bg_palette_addr(1));
    gba::dma3_copy(std::begin(bg_pal2::palette), std::end(bg_pal2::palette), gba::bg_palette_addr(2));
+   gba::dma3_copy(std::begin(bg_pal3::palette), std::end(bg_pal3::palette), gba::bg_palette_addr(3));
    gba::dma3_copy(std::begin(font_pal), std::end(font_pal), gba::obj_palette_addr(0));
    gba::dma3_copy(std::begin(obj_pal1::palette), std::end(obj_pal1::palette), gba::obj_palette_addr(1));
    gba::dma3_copy(std::begin(obj_pal2::palette), std::end(obj_pal2::palette), gba::obj_palette_addr(2));

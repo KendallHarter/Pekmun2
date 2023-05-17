@@ -171,6 +171,7 @@ process_map(test_layers test_layers)
 process_image_directory(obj_pal1 obj_pal1)
 process_image_directory(obj_pal2 obj_pal2)
 process_image_directory(bg_pal2 bg_pal2)
+process_image_directory(bg_pal3 bg_pal3)
 
 add_dependencies(pekmun2
    font
@@ -185,6 +186,7 @@ add_dependencies(pekmun2
    obj_pal1
    obj_pal2
    bg_pal2
+   bg_pal3
 )
 add_dependencies(scrolling test_tileset font)
 add_dependencies(layers test_tileset snake move_indicator)

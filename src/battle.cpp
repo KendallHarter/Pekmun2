@@ -326,6 +326,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
 
    std::fill(player_unit_present.begin(), player_unit_present.end(), false);
    combatant* moving_unit = nullptr;
+   combatant* attacking_unit = nullptr;
    static_vector<pos, num_squares> move_tiles;
    while (true) {
       const auto update_screen = [&]() {
@@ -367,6 +368,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             const auto end_obj = gba::obj{3 * i};
             const auto combatant_obj = gba::obj{1 + 3 * i};
             const auto health_bar_obj = gba::obj{2 + 3 * i};
+            const auto& cur_combatant = *combatant_pointers[i];
             if (i >= std::ssize(combatant_pointers)) {
                // disable the sprite
                combatant_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
@@ -374,7 +376,6 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                health_bar_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
                continue;
             }
-            const auto& cur_combatant = *combatant_pointers[i];
             const auto palette_no = class_data[cur_combatant.stats->class_].palette;
             combatant_obj.set_tile_and_attr2(
                cur_combatant.tile_no, gba::obj_attr2_options{}.set(palette_num{palette_no}));
@@ -412,6 +413,33 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             else {
                end_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
             }
+            // Health bars
+            if (cur_combatant.stats->class_ != cursor_class) {
+               const auto hp_tile_loc = max_enemies * 8 + max_player_units_on_map * 8 + 2 + i * 2;
+               const auto hp_tile_write_loc = gba::base_obj_tile_addr(0) + hp_tile_loc * 8;
+               const auto hp_bar_val = static_cast<int>(16 * cur_combatant.stats->hp / cur_combatant.stats->max_hp);
+               const auto left_half = std::min(7, hp_bar_val);
+               const auto right_half = std::clamp(hp_bar_val, 8, 15);
+               const auto palette = cur_combatant.is_enemy ? 2 : 1;
+               std::copy(
+                  &obj_pal1::health_bar[left_half * 8], &obj_pal1::health_bar[left_half * 8] + 8, hp_tile_write_loc);
+               std::copy(
+                  &obj_pal1::health_bar[right_half * 8],
+                  &obj_pal1::health_bar[right_half * 8] + 8,
+                  hp_tile_write_loc + 8);
+               health_bar_obj.set_attr0(gba::obj_attr0_options{}
+                                           .set(shape::horizontal)
+                                           .set(display::enable)
+                                           .set(mosaic::disable)
+                                           .set(mode::normal));
+               health_bar_obj.set_attr1(
+                  gba::obj_attr1_options{}.set(size::h16x8).set(vflip::disable).set(hflip::disable));
+               health_bar_obj.set_tile_and_attr2(hp_tile_loc, gba::obj_attr2_options{}.set(palette_num{palette}));
+               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i + 2, 8, 5);
+            }
+            else {
+               health_bar_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
+            }
          }
 
          gba::bg0.set_scroll(camera_x, camera_y);
@@ -426,6 +454,21 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          scroll_layer(camera_x, camera_y, high_priority_buffer.data(), bg0_screen_block, delta_x, delta_y);
          scroll_layer(camera_x, camera_y, low_priority_buffer.data(), bg1_screen_block, delta_x, delta_y);
       };
+
+      // check if the map is finished
+      bool done = true;
+      for (const auto& enemy : enemies) {
+         if (enemy.stats->hp > 0) {
+            done = false;
+            break;
+         }
+      }
+      if (done) {
+         for (auto& unit : player_units) {
+            unit.stats->deployed = false;
+         }
+         return true;
+      }
 
       const auto matches_cursor_loc = [&](const auto& obj) { return cursor.x == obj.x && cursor.y == obj.y; };
 
@@ -446,6 +489,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
 
       const auto finish_or_cancel_move = [&]() {
          moving_unit = nullptr;
+         attacking_unit = nullptr;
          gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          gba::dma3_fill(bg1_tiles, bg1_tiles + 32 * 32, blank_tile);
          gba::dma3_fill(low_priority_buffer.begin(), low_priority_buffer.end(), blank_tile);
@@ -453,13 +497,13 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          update_screen();
       };
 
-      const auto player_unit_menu = [&](combatant& unit) {
+      const auto player_unit_menu = [&](combatant& unit, int default_option = 0) {
          constexpr std::array<const char*, 2> options{"Move", "Attack"};
          gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          init_screen();
          update_screen();
          gba::bg0.set_scroll(0, 0);
-         const auto choice = menu(save_data, options, 0, 0, 0, true);
+         const auto choice = menu(save_data, options, 0, 0, default_option, true);
          gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          if (choice == 0) {
             moving_unit = &unit;
@@ -468,7 +512,14 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             fill_move_buffers(map_info, 2, move_tiles, low_priority_buffer, high_priority_buffer);
          }
          else if (choice == 1) {
-            unit.acted = true;
+            attacking_unit = &unit;
+            move_tiles = find_path(unit.x, unit.y, 1, 99, map_info, {});
+            // remove the unit's tile
+            const auto remove_loc = std::find(move_tiles.begin(), move_tiles.end(), pos{unit.x, unit.y});
+            if (remove_loc != move_tiles.end()) {
+               move_tiles.erase(remove_loc);
+            }
+            fill_move_buffers(map_info, 3, move_tiles, low_priority_buffer, high_priority_buffer);
          }
          init_screen();
          update_screen();
@@ -492,7 +543,12 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             // TODO: Enemy turn
          }
          else if (choice == 1) {
-            return false;
+            const std::array<const char*, 2> options2{"Don't exit", "Really exit"};
+            const auto choice2 = menu(save_data, options2, 0, 0, 0, true);
+            gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
+            if (choice2 == 1) {
+               return false;
+            }
          }
          return true;
       };
@@ -506,6 +562,13 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             finish_or_cancel_move();
             unit.moved = false;
             player_unit_menu(unit);
+         }
+         else if (attacking_unit != nullptr) {
+            cursor.x = attacking_unit->x;
+            cursor.y = attacking_unit->y;
+            auto& unit = *attacking_unit;
+            finish_or_cancel_move();
+            player_unit_menu(unit, 1);
          }
          else if (player_iter != player_units.end()) {
             auto& unit = *player_iter;
@@ -542,7 +605,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             const auto& unit = player_units[index];
             // Very hack-ish fix to show just the selected member
             const auto char_span = std::span<character>{unit.stats, unit.stats + 1};
-            display_stats(save_data, char_span, index, false);
+            display_stats(save_data, char_span, 0, false);
             init_screen();
             gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          }
@@ -571,6 +634,18 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                      player_unit_menu(unit);
                   }
                }
+            }
+         }
+         else if (attacking_unit != nullptr) {
+            const auto enemy_iter = std::find_if(enemies.begin(), enemies.end(), matches_cursor_loc);
+            if (enemy_iter != enemies.end()) {
+               attacking_unit->acted = true;
+               const auto damage = calc_normal_damage(*attacking_unit->stats, *enemy_iter->stats);
+               enemy_iter->stats->hp -= damage;
+               if (enemy_iter->stats->hp <= 0) {
+                  enemies.erase(enemy_iter);
+               }
+               finish_or_cancel_move();
             }
          }
          else if (player_iter != player_units.end() && !player_iter->acted) {
