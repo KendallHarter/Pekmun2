@@ -166,6 +166,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          new_enemy.x = enemy.x;
          new_enemy.y = enemy.y;
          new_enemy.stats = &new_stats;
+         new_enemy.is_enemy = true;
          new_stats.class_ = enemy.class_;
          new_stats.bases = class_data[enemy.class_].stats;
          new_stats.calc_stats(true);
@@ -176,6 +177,11 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          gba::dma3_copy(std::begin(tile_data), std::end(tile_data), gba::base_obj_tile_addr(0) + tile_offset * 8);
       }
    }
+
+   // E sprite for indicating a unit has acted
+   const auto end_sprite_loc_tile = (max_enemies + max_player_units_on_map) * 8;
+   const auto end_sprite_offset = end_sprite_loc_tile * 8;
+   gba::dma3_copy(std::begin(obj_pal1::end), std::end(obj_pal1::end), gba::base_obj_tile_addr(0) + end_sprite_offset);
 
    const auto bg0_tiles = gba::bg_screen_loc(bg0_screen_block);
    const auto bg1_tiles = gba::bg_screen_loc(bg1_screen_block);
@@ -355,11 +361,20 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             return lhs->y > rhs->y;
          });
 
-         // Assign objects to combatants (3 per combatant, the two extra are for HP bar and damage numbers)
-         for (int i = 0; i < std::ssize(combatant_pointers); ++i) {
-            const auto combatant_obj = gba::obj{3 * i};
-            const auto& cur_combatant = *combatant_pointers[i];
+         // Assign objects to combatants (3 per combatant, the two extra are for HP bar and end indicator)
+         for (int i = 0; i < static_cast<int>(combatant_pointers.max_size()); ++i) {
             using namespace gba::obj_opt;
+            const auto end_obj = gba::obj{3 * i};
+            const auto combatant_obj = gba::obj{1 + 3 * i};
+            const auto health_bar_obj = gba::obj{2 + 3 * i};
+            if (i >= std::ssize(combatant_pointers)) {
+               // disable the sprite
+               combatant_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
+               end_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
+               health_bar_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
+               continue;
+            }
+            const auto& cur_combatant = *combatant_pointers[i];
             const auto palette_no = class_data[cur_combatant.stats->class_].palette;
             combatant_obj.set_tile_and_attr2(
                cur_combatant.tile_no, gba::obj_attr2_options{}.set(palette_num{palette_no}));
@@ -371,7 +386,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                                           .set(shape::square));
                combatant_obj.set_attr1(
                   gba::obj_attr1_options{}.set(size::s32x32).set(vflip::disable).set(hflip::disable));
-               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 0, -17);
+               display_sprite(cur_combatant.x, cur_combatant.y, 1 + 3 * i, 0, -17);
             }
             else {
                combatant_obj.set_attr0(gba::obj_attr0_options{}
@@ -381,7 +396,21 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                                           .set(shape::vertical));
                combatant_obj.set_attr1(
                   gba::obj_attr1_options{}.set(size::v16x32).set(vflip::disable).set(hflip::disable));
-               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 8, -24);
+               display_sprite(cur_combatant.x, cur_combatant.y, 1 + 3 * i, 8, -24);
+            }
+            // Display E above units that have acted
+            if (cur_combatant.acted) {
+               end_obj.set_tile_and_attr2(end_sprite_loc_tile, gba::obj_attr2_options{}.set(palette_num::p1));
+               end_obj.set_attr0(gba::obj_attr0_options{}
+                                    .set(display::enable)
+                                    .set(mode::normal)
+                                    .set(mosaic::disable)
+                                    .set(shape::square));
+               end_obj.set_attr1(gba::obj_attr1_options{}.set(size::s8x8).set(vflip::disable).set(hflip::disable));
+               display_sprite(cur_combatant.x, cur_combatant.y, 3 * i, 12, -32);
+            }
+            else {
+               end_obj.set_attr0(gba::obj_attr0_options{}.set(display::disable).set(rot_scale::disable));
             }
          }
 
@@ -401,10 +430,6 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
       const auto matches_cursor_loc = [&](const auto& obj) { return cursor.x == obj.x && cursor.y == obj.y; };
 
       const auto& keypad = wait_vblank_and_update(save_data);
-
-      if (keypad.start_pressed()) {
-         return true;
-      }
 
       if (keypad.left_repeat()) {
          cursor.x -= 1;
@@ -430,32 +455,57 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
 
       const auto player_unit_menu = [&](combatant& unit) {
          constexpr std::array<const char*, 2> options{"Move", "Attack"};
-         gba::bg0.set_scroll(0, 0);
          gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
+         init_screen();
+         update_screen();
+         gba::bg0.set_scroll(0, 0);
          const auto choice = menu(save_data, options, 0, 0, 0, true);
-         gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
-         if (choice == 0 && !unit.acted) {
+         gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
+         if (choice == 0) {
             moving_unit = &unit;
             move_tiles = find_path(
                unit.start_x, unit.start_y, unit.stats->bases.move, unit.stats->bases.jump, map_info, enemies);
             fill_move_buffers(map_info, 2, move_tiles, low_priority_buffer, high_priority_buffer);
          }
+         else if (choice == 1) {
+            unit.acted = true;
+         }
          init_screen();
          update_screen();
+      };
+
+      const auto start_menu = [&]() {
+         constexpr std::array<const char*, 2> options{"End Turn", "Exit Map"};
+         gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
+         init_screen();
+         update_screen();
+         gba::bg0.set_scroll(0, 0);
+         const auto choice = menu(save_data, options, 0, 0, 0, true);
+         gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
+         if (choice == 0) {
+            for (auto& unit : player_units) {
+               unit.acted = false;
+               unit.moved = false;
+               unit.start_x = unit.x;
+               unit.start_y = unit.y;
+            }
+            // TODO: Enemy turn
+         }
+         else if (choice == 1) {
+            return false;
+         }
+         return true;
       };
 
       if (keypad.b_pressed()) {
          const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
          if (moving_unit != nullptr) {
-            // Don't allow moving to the same panel
-            if (cursor.x != moving_unit->x || cursor.y != moving_unit->y) {
-               cursor.x = moving_unit->x;
-               cursor.y = moving_unit->y;
-               auto& unit = *moving_unit;
-               finish_or_cancel_move();
-               unit.moved = false;
-               player_unit_menu(unit);
-            }
+            cursor.x = moving_unit->x;
+            cursor.y = moving_unit->y;
+            auto& unit = *moving_unit;
+            finish_or_cancel_move();
+            unit.moved = false;
+            player_unit_menu(unit);
          }
          else if (player_iter != player_units.end()) {
             auto& unit = *player_iter;
@@ -466,8 +516,6 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                player_unit_present[unit.index] = false;
                unit.stats->deployed = false;
                player_units.erase(player_iter);
-               // Disable all sprites so the sprite is no longer drawn (the relevant ones will be enabled later)
-               disable_all_sprites();
             }
             else if (unit.moved && !unit.acted) {
                unit.x = unit.start_x;
@@ -478,7 +526,6 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             }
          }
       }
-
       else if (keypad.l_pressed()) {
          const auto enemy_iter = std::find_if(enemies.begin(), enemies.end(), matches_cursor_loc);
          const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
@@ -487,7 +534,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             const auto index = std::distance(enemies.begin(), enemy_iter);
             display_stats(save_data, enemy_stats, index, false);
             init_screen();
-            gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+            gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          }
          else if (player_iter != player_units.end()) {
             gba::bg0.set_scroll(0, 0);
@@ -497,32 +544,36 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
             const auto char_span = std::span<character>{unit.stats, unit.stats + 1};
             display_stats(save_data, char_span, index, false);
             init_screen();
-            gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+            gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          }
       }
-
       else if (keypad.a_pressed()) {
          const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
          if (moving_unit != nullptr) {
-            const auto move_to = pos{cursor.x, cursor.y};
-            if (std::find(move_tiles.begin(), move_tiles.end(), move_to) != move_tiles.end()) {
-               moving_unit->x = move_to.x;
-               moving_unit->y = move_to.y;
-               moving_unit->moved = true;
-               auto& unit = *moving_unit;
-               finish_or_cancel_move();
-               if (unit.x == map_info.base_x && unit.y == map_info.base_y) {
-                  // if moved into the base put the character away
-                  player_unit_present[unit.index] = false;
-                  unit.stats->deployed = false;
-                  const auto player_iter = std::find_if(
-                     player_units.begin(), player_units.end(), [&](const auto& value) { return &value == &unit; });
-                  player_units.erase(player_iter);
-                  disable_all_sprites();
+            // Don't allow moving to the same panel
+            if (cursor.x != moving_unit->x || cursor.y != moving_unit->y) {
+               const auto move_to = pos{cursor.x, cursor.y};
+               if (std::find(move_tiles.begin(), move_tiles.end(), move_to) != move_tiles.end()) {
+                  moving_unit->x = move_to.x;
+                  moving_unit->y = move_to.y;
+                  moving_unit->moved = true;
+                  auto& unit = *moving_unit;
+                  finish_or_cancel_move();
+                  if (unit.x == map_info.base_x && unit.y == map_info.base_y) {
+                     // if moved into the base put the character away
+                     player_unit_present[unit.index] = false;
+                     unit.stats->deployed = false;
+                     const auto player_iter = std::find_if(
+                        player_units.begin(), player_units.end(), [&](const auto& value) { return &value == &unit; });
+                     player_units.erase(player_iter);
+                  }
+                  else {
+                     player_unit_menu(unit);
+                  }
                }
             }
          }
-         else if (player_iter != player_units.end()) {
+         else if (player_iter != player_units.end() && !player_iter->acted) {
             player_unit_menu(*player_iter);
          }
          else if (cursor.x == map_info.base_x && cursor.y == map_info.base_y) {
@@ -557,15 +608,27 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                      const auto write_loc = gba::base_obj_tile_addr(0) + tile_no * 8;
                      new_unit.tile_no = tile_no;
                      gba::dma3_copy(std::begin(tile_data), std::end(tile_data), write_loc);
-                     gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+                     gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
                      init_screen();
                      update_screen();
                      player_unit_menu(new_unit);
                   }
                   else {
-                     gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, gba::make_tile(blank_tile, 1));
+                     gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
                   }
                }
+            }
+         }
+         else {
+            if (!start_menu()) {
+               return false;
+            }
+         }
+      }
+      else if (keypad.start_pressed()) {
+         if (moving_unit == nullptr) {
+            if (!start_menu()) {
+               return false;
             }
          }
       }

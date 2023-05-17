@@ -24,7 +24,7 @@ static_vector<pos, num_squares> find_path(
       if (seen_loc != seen.end()) {
          // if this is at a lesser depth we expand it
          const auto offset = seen_loc - seen.begin();
-         if (seen_depths[offset] < depth) {
+         if (depth >= seen_depths[offset]) {
             continue;
          }
       }

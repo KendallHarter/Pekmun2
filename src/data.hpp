@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <random>
 
-constexpr int max_move = 15;
+constexpr int max_move = 7;
 
 struct item {
    bool exists = false;
@@ -100,6 +100,7 @@ struct combatant {
    std::int8_t index;
    bool moved = false;
    bool acted = false;
+   bool is_enemy = false;
    int tile_no;
    character* stats;
 };

@@ -13,7 +13,8 @@ enum class_ids : std::uint8_t {
    cursor_class,
    snake,
    snake_minion,
-   evil_snake
+   evil_snake,
+   super_snake
 };
 
 struct class_info {
@@ -63,6 +64,19 @@ inline constexpr class_info class_data[]{
      .speed = 3,
      .hit = 3,
      .move = 4,
-     .jump = 3}}};
+     .jump = 3}},
+   {1,
+    "Super Snake",
+    obj_pal1::snake,
+    {.hp = 40,
+     .mp = 40,
+     .attack = 40,
+     .defense = 40,
+     .m_attack = 40,
+     .m_defense = 40,
+     .speed = 40,
+     .hit = 40,
+     .move = max_move,
+     .jump = 99}}};
 
 #endif // CLASSES_HPP
