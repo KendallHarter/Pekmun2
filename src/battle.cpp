@@ -456,18 +456,30 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
       };
 
       // check if the map is finished
-      bool done = true;
+      bool won = true;
       for (const auto& enemy : enemies) {
          if (enemy.stats->hp > 0) {
-            done = false;
+            won = false;
             break;
          }
       }
-      if (done) {
+      if (won) {
          for (auto& unit : player_units) {
             unit.stats->deployed = false;
+            unit.stats->fully_heal();
          }
          return true;
+      }
+
+      bool lost = true;
+      for (const auto& unit : save_data.characters) {
+         if (unit.hp > 0) {
+            lost = false;
+            break;
+         }
+      }
+      if (lost) {
+         return false;
       }
 
       const auto matches_cursor_loc = [&](const auto& obj) { return cursor.x == obj.x && cursor.y == obj.y; };
@@ -533,14 +545,69 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          gba::bg0.set_scroll(0, 0);
          const auto choice = menu(save_data, options, 0, 0, 0, true);
          gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
-         if (choice == 0) {
+         if (choice == 0 && player_units.size() > 0) {
             for (auto& unit : player_units) {
                unit.acted = false;
                unit.moved = false;
                unit.start_x = unit.x;
                unit.start_y = unit.y;
             }
-            // TODO: Enemy turn
+            // Enemy turn
+            for (auto& enemy : enemies) {
+               cursor.x = enemy.x;
+               cursor.y = enemy.y;
+               update_screen();
+               move_tiles = find_path(
+                  enemy.x, enemy.y, enemy.stats->bases.move, enemy.stats->bases.jump, map_info, player_units);
+               // remove any panels that already have an enemy unit on them
+               for (const auto& enemy2 : enemies) {
+                  if (&enemy == &enemy2) {
+                     continue;
+                  }
+                  const auto iter = std::find(move_tiles.begin(), move_tiles.end(), pos{enemy2.x, enemy2.y});
+                  if (iter != move_tiles.end()) {
+                     move_tiles.erase(iter);
+                  }
+               }
+               // try to attack the closest unit to the starting location
+               const auto dist = [](int x1, int y1, int x2, int y2) { return std::abs(x2 - x1) + std::abs(y2 - y1); };
+               auto closest_unit = [&]() {
+                  const auto comp = [&](const auto& u1, const auto& u2) {
+                     const auto dist1 = dist(u1.x, u1.y, enemy.x, enemy.y);
+                     const auto dist2 = dist(u2.x, u2.y, enemy.x, enemy.y);
+                     return dist1 < dist2;
+                  };
+                  return std::min_element(player_units.begin(), player_units.end(), comp);
+               }();
+               // Find the panel that's the closest to that unit
+               const auto& closest_panel = [&]() {
+                  const auto comp = [&](const auto& u1, const auto& u2) {
+                     const auto dist1 = dist(u1.x, u1.y, closest_unit->x, closest_unit->y);
+                     const auto dist2 = dist(u2.x, u2.y, closest_unit->x, closest_unit->y);
+                     return dist1 < dist2;
+                  };
+                  return *std::min_element(move_tiles.begin(), move_tiles.end(), comp);
+               }();
+               enemy.x = closest_panel.x;
+               enemy.y = closest_panel.y;
+               cursor.x = closest_panel.x;
+               cursor.y = closest_panel.y;
+               enemy.acted = true;
+               // if one tile away we can attack
+               if (dist(enemy.x, enemy.y, closest_unit->x, closest_unit->y) == 1) {
+                  const auto damage = calc_normal_damage(*enemy.stats, *closest_unit->stats);
+                  closest_unit->stats->hp -= damage;
+                  // TODO: Removing units
+               }
+            }
+            for (auto& enemy : enemies) {
+               enemy.acted = false;
+            }
+            // Set the cursor to the first player unit
+            const auto& front = player_units.front();
+            cursor.x = front.x;
+            cursor.y = front.y;
+            update_screen();
          }
          else if (choice == 1) {
             const std::array<const char*, 2> options2{"Don't exit", "Really exit"};
