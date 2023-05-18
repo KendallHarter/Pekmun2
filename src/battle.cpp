@@ -167,6 +167,7 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          new_enemy.y = enemy.y;
          new_enemy.stats = &new_stats;
          new_enemy.is_enemy = true;
+         new_enemy.is_boss = enemy.is_boss;
          new_stats.class_ = enemy.class_;
          new_stats.bases = class_data[enemy.class_].stats;
          new_stats.calc_stats(true);
@@ -708,28 +709,42 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
                         player_units.begin(), player_units.end(), [&](const auto& value) { return &value == &unit; });
                      player_units.erase(player_iter);
                   }
-                  else {
-                     player_unit_menu(unit);
-                  }
+                  // else {
+                  //    player_unit_menu(unit);
+                  // }
                }
             }
          }
          else if (attacking_unit != nullptr) {
-            const auto enemy_iter = std::find_if(enemies.begin(), enemies.end(), matches_cursor_loc);
-            if (enemy_iter != enemies.end()) {
-               attacking_unit->acted = true;
-               const auto damage = calc_normal_damage(*attacking_unit->stats, *enemy_iter->stats);
-               enemy_iter->stats->hp -= damage;
-               if (enemy_iter->stats->hp <= 0) {
-                  attacking_unit->stats->exp += enemy_iter->stats->level * 30;
-                  attacking_unit->stats->level_up_if_needed();
-                  enemies.erase(enemy_iter);
+            if (std::ranges::find(move_tiles, pos{cursor.x, cursor.y}) != move_tiles.end()) {
+               const auto enemy_iter = std::find_if(enemies.begin(), enemies.end(), matches_cursor_loc);
+               if (enemy_iter != enemies.end()) {
+                  attacking_unit->acted = true;
+                  const auto damage = calc_normal_damage(*attacking_unit->stats, *enemy_iter->stats);
+                  enemy_iter->stats->hp -= damage;
+                  if (enemy_iter->stats->hp <= 0) {
+                     if (enemy_iter->is_boss) {
+                        attacking_unit->stats->exp += enemy_iter->stats->level * 300;
+                     }
+                     else {
+                        attacking_unit->stats->exp += enemy_iter->stats->level * 30;
+                     }
+                     attacking_unit->stats->level_up_if_needed();
+                     enemies.erase(enemy_iter);
+                  }
+                  finish_or_cancel_move();
                }
-               finish_or_cancel_move();
             }
          }
-         else if (player_iter != player_units.end() && !player_iter->acted) {
-            player_unit_menu(*player_iter);
+         else if (player_iter != player_units.end()) {
+            if (!player_iter->acted) {
+               player_unit_menu(*player_iter);
+            }
+            else {
+               if (!start_menu()) {
+                  return false;
+               }
+            }
          }
          else if (cursor.x == map_info.base_x && cursor.y == map_info.base_y) {
             static_vector<const char*, max_characters> char_names;

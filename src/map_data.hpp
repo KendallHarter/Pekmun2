@@ -13,7 +13,7 @@
 inline constexpr auto map_data_max_width = 16;
 inline constexpr auto tilemap_width = 60;
 inline constexpr auto tilemap_height = 40;
-inline constexpr auto num_chapters = 2;
+inline constexpr auto num_chapters = 1;
 inline constexpr auto max_enemies = 12;
 inline constexpr auto max_player_units_on_map = 8;
 

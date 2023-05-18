@@ -124,6 +124,7 @@ struct combatant {
    bool moved = false;
    bool acted = false;
    bool is_enemy = false;
+   bool is_boss = false;
    int tile_no;
    character* stats;
 };
