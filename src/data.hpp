@@ -108,7 +108,7 @@ struct character {
 
 inline std::int64_t calc_normal_damage(const character& attacker, const character& defender) noexcept
 {
-   const auto base_damage = attacker.attack * 5 / 3 - defender.defense;
+   const auto base_damage = static_cast<std::int64_t>(attacker.attack) * 5 / 3 - defender.defense;
    if (base_damage < 0) {
       return 0;
    }

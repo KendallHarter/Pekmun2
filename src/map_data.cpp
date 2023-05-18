@@ -21,8 +21,8 @@ constexpr std::array<const char*, maps_per_chapter * num_chapters> map_names{{
    "Unlikely ambush",
    "Snake infestation!",
    "Faces of evil",
-   "Map seven",
-   "Eight",
+   "Danger near, danger far",
+   "Training grounds",
    "Supreme Snake",
    // Chapter 2
    // "A new beginning",
@@ -37,8 +37,8 @@ constexpr std::array<map_data, maps_per_chapter * num_chapters> map_data_array{
     test_layers.rebase_map(start_map_tileset, map_palette),
     cross.rebase_map(start_map_tileset, map_palette),
     test_map.rebase_map(start_map_tileset, map_palette),
-    {},
-    {},
+    cross.rebase_map(start_map_tileset, map_palette),
+    arena.rebase_map(start_map_tileset, map_palette),
     arena.rebase_map(start_map_tileset, map_palette)}};
 
 constexpr std::array<std::pair<std::int8_t, std::int8_t>, maps_per_chapter * num_chapters> base_locs{{// Chapter 1
@@ -47,7 +47,10 @@ constexpr std::array<std::pair<std::int8_t, std::int8_t>, maps_per_chapter * num
                                                                                                       {0, 6},
                                                                                                       {0, 6},
                                                                                                       {5, 4},
-                                                                                                      {0, 2}}};
+                                                                                                      {0, 2},
+                                                                                                      {5, 0},
+                                                                                                      {1, 1},
+                                                                                                      {0, 0}}};
 
 constexpr std::array<std::array<enemy_base, max_enemies>, maps_per_chapter * num_chapters> map_enemies{{
    // Chapter 1
@@ -79,9 +82,14 @@ constexpr std::array<std::array<enemy_base, max_enemies>, maps_per_chapter * num
      {7, evil_snake, 2, 2, false},
      {7, evil_snake, 2, 3, false}}},
    // 1-7
-   {{}},
+   {{{10, snail, 5, 8, false},
+     {10, snail, 9, 4, false},
+     {10, snail, 1, 4, false},
+     {10, face_, 4, 3, false},
+     {10, face_, 5, 3, false},
+     {10, face_, 6, 3, false}}},
    // 1-8
-   {{}},
+   {{{15, evil_snake, 2, 1, false}}},
    // 1-9
    {{2, super_snake, 3, 3, true}},
    // Chapter 2

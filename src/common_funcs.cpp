@@ -142,7 +142,7 @@ int menu(
    int default_choice,
    bool allow_cancel,
    bool draw_the_menu,
-   void (*on_refresh)(int)) noexcept
+   std::function<void(int, const gba::keypad_status&)> on_refresh) noexcept
 {
    if (draw_the_menu) {
       draw_menu(options, x, y);
@@ -183,7 +183,7 @@ int menu(
       }
 
       if (on_refresh != nullptr) {
-         on_refresh(choice);
+         on_refresh(choice, keypad);
       }
    }
 }

@@ -450,6 +450,7 @@ void main_game_loop() noexcept
    disable_all_sprites();
    gba::bg0.set_scroll(0, 0);
    int opt = 0;
+   int enemy_strength = 0;
    while (true) {
       constexpr const char* main_options[]{"Map", "Shop", "Equip", "Re-order", "New char", "Load", "Save"};
       const auto start_screen = gba::bg_screen_loc(gba::bg_opt::screen_base_block::b62);
@@ -465,6 +466,26 @@ void main_game_loop() noexcept
             const auto get_chapter_choices = [&]() {
                return std::span{std::begin(chapters), std::begin(chapters) + 1 + save_data.chapter};
             };
+            const auto adjust_enemy_strength = [&](int, const gba::keypad_status& keypad) {
+               if (keypad.left_repeat()) {
+                  enemy_strength -= 1;
+               }
+               else if (keypad.right_repeat()) {
+                  enemy_strength += 1;
+               }
+               if (keypad.l_pressed()) {
+                  enemy_strength -= 10;
+               }
+               else if (keypad.r_pressed()) {
+                  enemy_strength += 10;
+               }
+               enemy_strength = std::clamp(enemy_strength, 0, 999);
+               draw_box(gba::bg_opt::screen_base_block::b62, 11, 3, 16, 4);
+               char buffer[50];
+               std::fill(std::begin(buffer), std::end(buffer), '\0');
+               fmt::format_to_n(buffer, std::size(buffer) - 1, "Enemy Strength\n{: >14}", enemy_strength + 1);
+               write_at(gba::bg_opt::screen_base_block::b62, buffer, 11 + 1, 4);
+            };
             gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
             draw_menu(main_options, 0, 0, opt);
             ch_choice = menu(save_data, get_chapter_choices(), 11, 0, ch_choice, true);
@@ -474,10 +495,18 @@ void main_game_loop() noexcept
                   gba::dma3_fill(start_screen, start_screen + 32 * 32, ' ');
                   draw_menu(main_options, 0, 0, opt);
                   draw_menu(get_chapter_choices(), 11, 0, ch_choice);
-                  map_choice = menu(save_data, get_map_names(ch_choice, save_data), 0, 9, map_choice, true);
+                  map_choice = menu(
+                     save_data,
+                     get_map_names(ch_choice, save_data),
+                     0,
+                     9,
+                     map_choice,
+                     true,
+                     true,
+                     adjust_enemy_strength);
                   if (map_choice != -1) {
                      backup_data = save_data;
-                     if (do_battle(save_data, get_map_data_and_enemies(ch_choice, map_choice))) {
+                     if (do_battle(save_data, get_map_data_and_enemies(ch_choice, map_choice), enemy_strength)) {
                         if (ch_choice == save_data.chapter && map_choice == save_data.chapter_progress) {
                            save_data.chapter_progress += 1;
                            if (save_data.chapter_progress == 9) {

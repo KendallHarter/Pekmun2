@@ -4,6 +4,8 @@
 #include "gba.hpp"
 #include "save_data.hpp"
 
+#include <functional>
+
 const gba::keypad_status& wait_vblank_and_update(file_save_data& save_data, bool allow_soft_reset = true) noexcept;
 
 void disable_all_sprites() noexcept;
@@ -27,7 +29,7 @@ int menu(
    int default_choice,
    bool allow_cancel,
    bool draw_the_menu = true,
-   void (*on_refresh)(int) = nullptr) noexcept;
+   std::function<void(int, const gba::keypad_status&)> on_refresh = nullptr) noexcept;
 
 int display_stats(file_save_data& save_data, std::span<character> char_list, int index, bool allow_equipping) noexcept;
 

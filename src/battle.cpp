@@ -146,7 +146,7 @@ const auto fill_move_buffers = [](const full_map_info& map_info,
 } // anonymous namespace
 
 // Returns true if the map is beaten, false otherwise
-bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcept
+bool do_battle(file_save_data& save_data, const full_map_info& map_info, int enemy_strength) noexcept
 {
    disable_all_sprites();
 
@@ -162,7 +162,14 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          enemy_stats.push_back({});
          auto& new_enemy = enemies.back();
          auto& new_stats = enemy_stats.back();
-         new_stats.level = enemy.level;
+         if (enemy_strength > 0) {
+            const auto level = enemy.level;
+            const auto strength = enemy_strength + 1;
+            new_stats.level = level * (strength + 1) + strength * strength;
+         }
+         else {
+            new_stats.level = enemy.level;
+         }
          new_enemy.x = enemy.x;
          new_enemy.y = enemy.y;
          new_enemy.stats = &new_stats;
@@ -673,8 +680,8 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info) noexcep
          const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
          if (enemy_iter != enemies.end()) {
             gba::bg0.set_scroll(0, 0);
-            const auto index = std::distance(enemies.begin(), enemy_iter);
-            display_stats(save_data, enemy_stats, index, false);
+            const auto enemy_span = std::span<character>(enemy_iter->stats, enemy_iter->stats + 1);
+            display_stats(save_data, enemy_span, 0, false);
             init_screen();
             gba::dma3_fill(bg0_tiles, bg0_tiles + 32 * 32, blank_tile);
          }
