@@ -658,20 +658,26 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info, int ene
          }
          else if (player_iter != player_units.end()) {
             auto& unit = *player_iter;
-            if (
-               unit.start_x == map_info.base_x && unit.start_y == map_info.base_y && unit.start_x == unit.x
-               && unit.start_y == unit.y) {
-               // Stuff them back into the base
-               player_unit_present[unit.index] = false;
-               unit.stats->deployed = false;
-               player_units.erase(player_iter);
-            }
-            else if (unit.moved && !unit.acted) {
-               unit.x = unit.start_x;
-               unit.y = unit.start_y;
-               cursor.x = unit.start_x;
-               cursor.y = unit.start_y;
-               unit.moved = false;
+            // prohibit canceling if there's a unit at the starting loc
+            const auto iter2 = std::find_if(player_units.begin(), player_units.end(), [&](const auto& p) {
+               return p.x == unit.start_x && p.y == unit.start_y;
+            });
+            if (iter2 == player_units.end()) {
+               if (
+                  unit.start_x == map_info.base_x && unit.start_y == map_info.base_y && unit.start_x == unit.x
+                  && unit.start_y == unit.y) {
+                  // Stuff them back into the base
+                  player_unit_present[unit.index] = false;
+                  unit.stats->deployed = false;
+                  player_units.erase(player_iter);
+               }
+               else if (unit.moved && !unit.acted) {
+                  unit.x = unit.start_x;
+                  unit.y = unit.start_y;
+                  cursor.x = unit.start_x;
+                  cursor.y = unit.start_y;
+                  unit.moved = false;
+               }
             }
          }
       }
@@ -699,8 +705,8 @@ bool do_battle(file_save_data& save_data, const full_map_info& map_info, int ene
       else if (keypad.a_pressed()) {
          const auto player_iter = std::find_if(player_units.begin(), player_units.end(), matches_cursor_loc);
          if (moving_unit != nullptr) {
-            // Don't allow moving to the same panel
-            if (cursor.x != moving_unit->x || cursor.y != moving_unit->y) {
+            // Don't allow moving on top of other units (this also prohibits moving to own panel)
+            if (player_iter == player_units.end()) {
                const auto move_to = pos{cursor.x, cursor.y};
                if (std::find(move_tiles.begin(), move_tiles.end(), move_to) != move_tiles.end()) {
                   moving_unit->x = move_to.x;
