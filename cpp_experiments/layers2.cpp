@@ -83,7 +83,7 @@ int main()
                              .set(gba::obj_opt::mosaic::disable)
                              .set(shape::vertical));
 
-      snake_obj.set_attr1(gba::obj_attr1_options{}.set(size::h32x16));
+      snake_obj.set_attr1(gba::obj_attr1_options{}.set(size::v16x32));
 
       // Put in the upper-right corner box
       snake_obj.set_x(27 * 8);

@@ -144,6 +144,9 @@ fix_gba_target(health_bar_test)
 add_executable(sound_test cpp_experiments/sound_test.cpp)
 fix_gba_target(sound_test)
 
+add_executable(rotate cpp_experiments/rotate.cpp)
+fix_gba_target(rotate)
+
 # For experiments use this target
 add_library(standard_includes INTERFACE)
 target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -155,6 +158,7 @@ target_link_libraries(layers PUBLIC standard_includes)
 target_link_libraries(layers2 PUBLIC standard_includes fmt::fmt)
 target_link_libraries(health_bar_test PUBLIC standard_includes fmt::fmt)
 target_link_libraries(sound_test PUBLIC standard_includes fmt::fmt)
+target_link_libraries(rotate PUBLIC standard_includes fmt::fmt)
 
 process_image(font.png font)
 process_image(test_tileset.png test_tileset)
@@ -201,3 +205,4 @@ add_dependencies(layers test_tileset snake move_indicator)
 add_dependencies(layers2 test_tileset snake font stats_screen test_map move_indicator)
 add_dependencies(health_bar_test health_bar font)
 add_dependencies(sound_test font)
+add_dependencies(rotate snake font)

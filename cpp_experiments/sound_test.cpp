@@ -1,13 +1,13 @@
 #include "gba.hpp"
 
 #include "generated/font.hpp"
-#include "generated/health_bar.hpp"
 
 #include "fmt/core.h"
 
 #include <algorithm>
 #include <array>
 #include <iterator>
+#include <random>
 #include <tuple>
 
 volatile std::uint16_t* bg_screen_loc_at(gba::bg_opt::screen_base_block loc, int x, int y) noexcept
@@ -64,7 +64,7 @@ int main()
                               .set(display_bg1::off)
                               .set(display_bg2::off)
                               .set(display_bg3::off)
-                              .set(display_obj::on)
+                              .set(display_obj::off)
                               .set(display_window_0::off)
                               .set(display_window_1::off)
                               .set(display_window_obj::off)
@@ -129,6 +129,8 @@ int main()
       else if (keypad.up_repeat()) {
          option -= 1;
       }
+      option = std::clamp(option, 0, static_cast<int>(values.size() - 1));
+
       if (keypad.left_repeat()) {
          const auto change = keypad.r_held() ? 100 : 1;
          auto& val = std::get<0>(values[option]);
@@ -147,7 +149,6 @@ int main()
             val = limit;
          }
       }
-      option = std::clamp(option, 0, static_cast<int>(values.size() - 1));
       // Draw arrow
       write_bg0_char(arrow, 0, option * 2);
 
@@ -173,6 +174,14 @@ int main()
          for (int i = 0; i < std::ssize(sound_values); ++i) {
             volatile std::uint16_t* sound_ptr = (std::uint16_t*)(0x4000060 + 2 * i);
             *sound_ptr = sound_values[i];
+         }
+      }
+      else if (keypad.l_held()) {
+         // Play random sounds
+         static std::minstd_rand0 prng;
+         for (int i = 0; i < 3; ++i) {
+            volatile std::uint16_t* sound_ptr = (std::uint16_t*)(0x4000060 + 2 * i);
+            *sound_ptr = prng();
          }
       }
    }

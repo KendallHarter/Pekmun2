@@ -8,14 +8,14 @@
 #include <span>
 
 // Max number of tiles for move:
-// 1 = 5 = 3 * 3 / 2 + 1
+// 1 = 5 = floor(3 * 3 / 2) + 1
 // 2 =    x
 //       xxx
 //      xxxxx
 //       xxx
 //        x
 //   = 13
-//   = 5 * 5 / 2 + 1
+//   = floor(5 * 5 / 2) + 1
 // 3 =    x
 //       xxx
 //      xxxxx
@@ -24,7 +24,7 @@
 //       xxx
 //        x
 //   = 25
-//   = 7 * 7 / 2 + 1
+//   = floor(7 * 7 / 2) + 1
 // 4 =    x
 //       xxx
 //      xxxxx
@@ -35,8 +35,8 @@
 //       xxx
 //        x
 //   = 41
-//   = 9 * 9 / 2 + 1
-// n = (n * 2 + 1) * (n * 2 + 1) / 2 + 1
+//   = floor(9 * 9 / 2) + 1
+// n = floor((n * 2 + 1) * (n * 2 + 1) / 2) + 1
 
 struct pos {
    std::int8_t x;
