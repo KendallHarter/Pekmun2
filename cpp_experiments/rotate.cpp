@@ -59,8 +59,6 @@ int main()
    gba::dma3_copy(std::begin(snake), std::end(snake), gba::base_obj_tile_addr(0));
    gba::dma3_copy(std::begin(snake_pal), std::end(snake_pal), gba::obj_palette_addr(0));
 
-   *gba::bg_palette_addr(0) = gba::make_gba_color(0x00, 0x00, 0xA0);
-
    const auto snake_obj = gba::obj{0};
    const auto snake_obj2 = gba::obj{1};
    {
