@@ -16,16 +16,10 @@ std::uint16_t float_to_fixed(float f)
    const bool is_negative = f < 0.0;
    float integral;
    const auto fraction = std::abs(std::modf(f, &integral));
-   if (is_negative) {
-      const auto frac_part = max_fraction - std::clamp(static_cast<int>(fraction * max_fraction), 0, max_fraction);
-      const auto int_part = max_integer - std::clamp(static_cast<int>(std::abs(integral)), 0, max_integer);
-      return (is_negative << 15) | (int_part << 8) | (frac_part << 0);
-   }
-   else {
-      const auto frac_part = std::clamp(static_cast<int>(fraction * max_fraction), 0, max_fraction);
-      const auto int_part = std::clamp(static_cast<int>(std::abs(integral)), 0, max_integer);
-      return (is_negative << 15) | (int_part << 8) | (frac_part << 0);
-   }
+   const auto frac_part = std::clamp(static_cast<int>(fraction * max_fraction), 0, max_fraction);
+   const auto int_part = std::clamp(static_cast<int>(std::abs(integral)), 0, max_integer);
+   const auto ret_val = (int_part << 8) | frac_part;
+   return is_negative ? ~ret_val : ret_val;
 }
 
 volatile std::uint16_t* bg_screen_loc_at(gba::bg_opt::screen_base_block loc, int x, int y) noexcept
@@ -160,7 +154,7 @@ int main()
       }
 
       if (keypad.a_pressed()) {
-         values[option] ^= 0b1000'0000'0000'0000;
+         values[option] ^= 0b1111'1111'1111'1111;
       }
       // Draw arrow
       write_bg0_char(arrow, 0, option);
@@ -190,7 +184,6 @@ int main()
          (std::uint16_t*)0x0700003E};
       angle += 1;
       angle %= 360;
-      // angle is in degrees
       //   pa = x_scale * cos(angle)
       //   pb = y_scale * sin(angle)
       //   pc = x_scale * -sin(angle)
@@ -207,7 +200,7 @@ int main()
          *locs2[i] = float_to_fixed(test_values[i]);
          std::array<char, 20> buffer;
          std::fill(buffer.begin(), buffer.end(), '\0');
-         fmt::format_to_n(buffer.data(), buffer.size() - 1, "{:0}", test_values[i]);
+         fmt::format_to_n(buffer.data(), buffer.size() - 1, "{}", test_values[i]);
          write_bg0(buffer.data(), 1, 5 + i);
       }
    }
