@@ -6,6 +6,27 @@
 #include "fmt/core.h"
 
 #include <algorithm>
+#include <cmath>
+#include <numbers>
+
+std::uint16_t float_to_fixed(float f)
+{
+   const auto max_fraction = 0b0'0000000'11111111;
+   const auto max_integer = 0b0'1111111'00000000 >> 8;
+   const bool is_negative = f < 0.0;
+   float integral;
+   const auto fraction = std::abs(std::modf(f, &integral));
+   if (is_negative) {
+      const auto frac_part = max_fraction - std::clamp(static_cast<int>(fraction * max_fraction), 0, max_fraction);
+      const auto int_part = max_integer - std::clamp(static_cast<int>(std::abs(integral)), 0, max_integer);
+      return (is_negative << 15) | (int_part << 8) | (frac_part << 0);
+   }
+   else {
+      const auto frac_part = std::clamp(static_cast<int>(fraction * max_fraction), 0, max_fraction);
+      const auto int_part = std::clamp(static_cast<int>(std::abs(integral)), 0, max_integer);
+      return (is_negative << 15) | (int_part << 8) | (frac_part << 0);
+   }
+}
 
 volatile std::uint16_t* bg_screen_loc_at(gba::bg_opt::screen_base_block loc, int x, int y) noexcept
 {
@@ -47,22 +68,28 @@ int main()
    *gba::bg_palette_addr(0) = gba::make_gba_color(0x00, 0x00, 0xA0);
 
    const auto snake_obj = gba::obj{0};
+   const auto snake_obj2 = gba::obj{1};
    {
       using namespace gba::obj_opt;
       for (int i = 0; i < 128; ++i) {
          gba::obj{i}.set_attr0(gba::obj_attr0_options{}.set(display::disable));
       }
-      snake_obj.set_attr0(gba::obj_attr0_options{}
-                             .set(rot_scale::enable)
-                             .set(double_size::disable)
-                             .set(mode::normal)
-                             .set(mosaic::disable)
-                             .set(shape::vertical));
-      snake_obj.set_attr1(gba::obj_attr1_options{}.set(size::v16x32));
+      for (int i = 0; i < 2; ++i) {
+         gba::obj{i}.set_attr0(gba::obj_attr0_options{}
+                                  .set(rot_scale::enable)
+                                  .set(double_size::disable)
+                                  .set(mode::normal)
+                                  .set(mosaic::disable)
+                                  .set(shape::vertical));
+         gba::obj{i}.set_attr1(gba::obj_attr1_options{}.set(size::v16x32));
+      }
    }
 
    snake_obj.set_x(120);
    snake_obj.set_y(80);
+   snake_obj2.set_x(200);
+   snake_obj2.set_y(80);
+   snake_obj2.set_attr1(gba::obj_attr1_options{}.set(gba::obj_opt::rot_scale_param::p1));
 
    // Turn on screen
    {
@@ -96,6 +123,7 @@ int main()
    gba::keypad_status keypad;
    int option = 0;
    std::array<int, 4> values;
+   int angle = 0;
 
    while (true) {
       while (gba::in_vblank()) {}
@@ -153,6 +181,34 @@ int main()
          (std::uint16_t*)0x0700001E};
       for (int i = 0; i < 4; ++i) {
          *locs[i] = values[i];
+      }
+      // 2nd Group - PA=07000026, PB=0700002E, PC=07000036, PD=0700003E
+      std::array<volatile std::uint16_t*, 4> locs2{
+         (std::uint16_t*)0x07000026,
+         (std::uint16_t*)0x0700002E,
+         (std::uint16_t*)0x07000036,
+         (std::uint16_t*)0x0700003E};
+      angle += 1;
+      angle %= 360;
+      // angle is in degrees
+      //   pa = x_scale * cos(angle)
+      //   pb = y_scale * sin(angle)
+      //   pc = x_scale * -sin(angle)
+      //   pd = y_scale * cos(angle)
+      const auto deg_to_rad = [](float f) { return f * std::numbers::pi / 180.0; };
+
+      std::array<double, 4> test_values{
+         std::cos(deg_to_rad(angle)),
+         std::sin(deg_to_rad(angle)),
+         -std::sin(deg_to_rad(angle)),
+         std::cos(deg_to_rad(angle)),
+      };
+      for (auto i = 0; i < 4; ++i) {
+         *locs2[i] = float_to_fixed(test_values[i]);
+         std::array<char, 20> buffer;
+         std::fill(buffer.begin(), buffer.end(), '\0');
+         fmt::format_to_n(buffer.data(), buffer.size() - 1, "{:0}", test_values[i]);
+         write_bg0(buffer.data(), 1, 5 + i);
       }
    }
 }
