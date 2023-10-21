@@ -43,8 +43,8 @@ void write_at(gba::bg_opt::screen_base_block loc, const char* to_write, const in
    }
 }
 
-// Assumes 8x8 box for first and 6x6 box for second for calling simplicity
-bool collision(int x1, int y1, int x2, int y2) { return x1 < x2 + 8 && x1 + 6 > x2 && y1 < y2 + 8 && y1 + 6 > y2; }
+// Assumes 8x8 box for second and 4x4 box for first for calling simplicity
+bool collision(int x1, int y1, int x2, int y2) { return x1 < x2 + 8 && x1 + 4 > x2 && y1 < y2 + 8 && y1 + 4 > y2; }
 
 // clang-format off
 constexpr std::uint16_t box_sprite[] {
@@ -59,12 +59,12 @@ constexpr std::uint16_t box_sprite[] {
 };
 
 constexpr std::uint16_t small_box_sprite[] {
-   0x2220, 0x0222,
-   0x0020, 0x0200,
-   0x0020, 0x0200,
-   0x0020, 0x0200,
-   0x0020, 0x0200,
-   0x2220, 0x0222,
+   0x2222, 0x0000,
+   0x2002, 0x0000,
+   0x2002, 0x0000,
+   0x2222, 0x0000,
+   0x0000, 0x0000,
+   0x0000, 0x0000,
    0x0000, 0x0000,
    0x0000, 0x0000,
 };
@@ -212,17 +212,23 @@ int main()
          // return 0;
       }();
       const auto base_y = [&]() {
-         return 4 * sin(deg_to_rad(angle) / 2);
+         const auto base_value = std::lerp(0, 4, (angle % 180) / 180.f);
+         if (angle >= 0 && angle <= 180) {
+            return base_value;
+         }
+         else {
+            return 4 - base_value;
+         }
          // if (angle == 0) return 0;
          // if (angle == 90) return 2;
          // if (angle == 180) return 4;
          // if (angle == 270) return 2;
          // return 0;
       }();
-      const auto hitbox1_x = x + x_offset + base_x;
-      const auto hitbox1_y = y + y_offset + 2 + base_y;
-      const auto hitbox2_x = x + x_offset - base_x;
-      const auto hitbox2_y = y + y_offset + 8 - base_y - 2;
+      const auto hitbox1_x = x + x_offset + base_x + 2;
+      const auto hitbox1_y = y + y_offset + 6 + base_y;
+      const auto hitbox2_x = x + x_offset - base_x + 2;
+      const auto hitbox2_y = y + y_offset + 8 - base_y;
 
       const double data[]{hitbox2_x, hitbox2_y};
       const char* name[]{"x", "y"};
