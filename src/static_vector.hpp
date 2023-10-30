@@ -45,7 +45,15 @@ public:
       return *this;
    }
 
-   ~static_vector() noexcept { clear(); }
+   ~static_vector() noexcept
+      requires(std::is_trivially_destructible_v<T>)
+   = default;
+
+   ~static_vector() noexcept
+      requires(!std::is_trivially_destructible_v<T>)
+   {
+      clear();
+   }
 
    // Element access
 
