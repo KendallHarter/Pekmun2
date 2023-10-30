@@ -15,7 +15,7 @@ function(clone_repo name url tag)
          return()
       endif()
    endif()
-   find_package(Git)
+   find_package(Git REQUIRED)
    # gcmd = git command
    function(gcmd)
       execute_process(
@@ -115,6 +115,10 @@ function(process_image_directory input_dir output_name)
 
    add_custom_target(${output_name} DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/${output_name}.hpp")
 endfunction()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+   add_compile_options(-s -flto)
+endif()
 
 # We're always going to be GCC based so can just add these
 # Disable ABI change warnings because we don't care about them
