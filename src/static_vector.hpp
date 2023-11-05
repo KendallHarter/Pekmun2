@@ -30,6 +30,9 @@ public:
 
    static_vector& operator=(const static_vector& other) noexcept
    {
+      if (&other == this) {
+         return *this;
+      }
       clear();
       num_elements_ = other.num_elements_;
       std::copy(other.begin(), other.end(), begin());
@@ -38,6 +41,9 @@ public:
 
    static_vector& operator=(static_vector&& other) noexcept
    {
+      if (&other == this) {
+         return *this;
+      }
       clear();
       num_elements_ = other.num_elements_;
       std::move(other.begin(), other.end(), begin());
