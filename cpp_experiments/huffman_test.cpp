@@ -52,6 +52,7 @@ void decompress(
 
 int main()
 {
+   gba::set_fast_mode();
    gba::keypad_status keypad;
    while (true) {
       keypad.update();
