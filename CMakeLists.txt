@@ -153,6 +153,9 @@ fix_gba_target(rotate)
 add_executable(rotate2 cpp_experiments/rotate2.cpp)
 fix_gba_target(rotate2)
 
+add_executable(huffman_test cpp_experiments/huffman_test.cpp)
+fix_gba_target(huffman_test)
+
 # For experiments use this target
 add_library(standard_includes INTERFACE)
 target_include_directories(standard_includes INTERFACE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -166,6 +169,7 @@ target_link_libraries(health_bar_test PUBLIC standard_includes fmt::fmt)
 target_link_libraries(sound_test PUBLIC standard_includes fmt::fmt)
 target_link_libraries(rotate PUBLIC standard_includes fmt::fmt)
 target_link_libraries(rotate2 PUBLIC standard_includes fmt::fmt)
+target_link_libraries(huffman_test PUBLIC standard_includes)
 
 process_image(font.png font)
 process_image(test_tileset.png test_tileset)

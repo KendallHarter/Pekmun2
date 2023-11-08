@@ -697,6 +697,11 @@ inline volatile std::uint16_t* bg_screen_loc(bg_opt::screen_base_block opt) noex
    return reinterpret_cast<volatile std::uint16_t*>(0x600'0000 + 0x800 * static_cast<int>(opt));
 }
 
+inline volatile std::uint32_t* bg_screen_loc32(bg_opt::screen_base_block opt) noexcept
+{
+   return reinterpret_cast<volatile std::uint32_t*>(0x600'0000 + 0x800 * static_cast<int>(opt));
+}
+
 inline volatile std::uint16_t* bg_palette_addr(int num) noexcept
 {
    return reinterpret_cast<volatile std::uint16_t*>(0x500'0000 + 32 * num);
