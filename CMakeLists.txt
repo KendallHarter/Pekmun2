@@ -42,7 +42,7 @@ function(fix_gba_target target)
    add_custom_command(TARGET ${target} POST_BUILD
       COMMAND "${DEVKITARM_OBJCOPY}" -O binary "$<TARGET_FILE:${target}>" "$<TARGET_FILE:${target}>.gba"
       COMMAND "${DEVKITPRO_GBAFIX}" "$<TARGET_FILE:${target}>.gba" > /dev/null
-      BYPRODUCTS "$<TARGET_FILE:${target}>.gba"
+      # BYPRODUCTS "$<TARGET_FILE:${target}>.gba"
       VERBATIM
    )
 endfunction()
